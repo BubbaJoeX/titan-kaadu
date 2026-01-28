@@ -19,7 +19,7 @@ public static class Program
 {
     private const string DefaultHost = "test.swgtitan.org";
     private const int DefaultPort = 22;
-    private const string RemoteBasePath = "/upload";
+    private const string RemoteBasePath = "/sftp/sftpuser/upload";
     private const string LauncherPath = "/launcher";
     private const string ConfigPath = "/config";
 
