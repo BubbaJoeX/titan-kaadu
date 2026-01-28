@@ -1,0 +1,348 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\services\\launcherupdateservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\services\\launcherupdateservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\views\\loginview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\views\\loginview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\views\\launcherview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\views\\launcherview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\views\\installpathview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\views\\installpathview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\views\\adminview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\views\\adminview.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\models\\usersettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\models\\usersettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\services\\isettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\services\\isettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\services\\settingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\services\\settingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\jojoj\\AppData\\Local\\Temp\\VisualStudio\\copilot-vs\\plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md||{EFC0BB08-EA7D-40C6-A696-C870411A895B}|MarkdownSecurePreview"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\kaadu.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\kaadu.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\models\\appconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\models\\appconfiguration.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\views\\adminconsolewindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\views\\adminconsolewindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Kaadu.Deploy\\Program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\jojoj\\source\\repos\\Kaadu\\deploy.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:deploy.ps1||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\models\\launcherversioninfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\models\\launcherversioninfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|c:\\users\\jojoj\\source\\repos\\kaadu\\kaadu\\services\\ilauncherupdateservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{49900473-D7FB-F638-301B-3BFCF0C45DCB}|Kaadu\\Kaadu.csproj|solutionrelative:kaadu\\services\\ilauncherupdateservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Kaadu.Deploy.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:Kaadu.Deploy\\Kaadu.Deploy.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 12,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e5c86464-96be-4d7c-9a8b-abcb3bbf5f92}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{d84ee353-0bef-5a41-a649-8f89aca5d84d}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{6324226f-61b6-4f28-92ee-18d4b5fe1e48}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "InstallPathView.xaml",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\InstallPathView.xaml",
+              "RelativeDocumentMoniker": "Kaadu\\Views\\InstallPathView.xaml",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\InstallPathView.xaml",
+              "RelativeToolTip": "Kaadu\\Views\\InstallPathView.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-01-20T22:05:26.71Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "AdminView.xaml",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\AdminView.xaml",
+              "RelativeDocumentMoniker": "Kaadu\\Views\\AdminView.xaml",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\AdminView.xaml",
+              "RelativeToolTip": "Kaadu\\Views\\AdminView.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-01-20T22:05:26.418Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "LoginView.xaml",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\LoginView.xaml",
+              "RelativeDocumentMoniker": "Kaadu\\Views\\LoginView.xaml",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\LoginView.xaml",
+              "RelativeToolTip": "Kaadu\\Views\\LoginView.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-01-20T22:05:01.553Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "LauncherView.xaml",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\LauncherView.xaml",
+              "RelativeDocumentMoniker": "Kaadu\\Views\\LauncherView.xaml",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\LauncherView.xaml",
+              "RelativeToolTip": "Kaadu\\Views\\LauncherView.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-01-20T22:04:45.571Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "SettingsService.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\SettingsService.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Services\\SettingsService.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\SettingsService.cs",
+              "RelativeToolTip": "Kaadu\\Services\\SettingsService.cs",
+              "ViewState": "AgIAADwAAAAAAAAAAAAuwFgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:57:43.276Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "ISettingsService.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\ISettingsService.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Services\\ISettingsService.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\ISettingsService.cs",
+              "RelativeToolTip": "Kaadu\\Services\\ISettingsService.cs",
+              "ViewState": "AgIAACEAAAAAAAAAAAAIwDwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:57:18.428Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md [Preview]",
+              "DocumentMoniker": "C:\\Users\\jojoj\\AppData\\Local\\Temp\\VisualStudio\\copilot-vs\\plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md",
+              "RelativeDocumentMoniker": "..\\..\\..\\AppData\\Local\\Temp\\VisualStudio\\copilot-vs\\plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md",
+              "ToolTip": "C:\\Users\\jojoj\\AppData\\Local\\Temp\\VisualStudio\\copilot-vs\\plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md [Preview]",
+              "RelativeToolTip": "..\\..\\..\\AppData\\Local\\Temp\\VisualStudio\\copilot-vs\\plan-3e4ad524-d8b2-4dd4-bae1-689ffbaa05ae.md [Preview]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
+              "WhenOpened": "2026-01-20T21:56:37.134Z",
+              "EditorCaption": " [Preview]"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "Kaadu",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Kaadu.csproj",
+              "RelativeDocumentMoniker": "Kaadu\\Kaadu.csproj",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Kaadu.csproj",
+              "RelativeToolTip": "Kaadu\\Kaadu.csproj",
+              "ViewState": "AgIAAAkAAAAAAAAAAAAlwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-01-20T21:53:11.339Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 18,
+              "Title": "Kaadu.Deploy.csproj",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Kaadu.Deploy.csproj",
+              "RelativeDocumentMoniker": "Kaadu.Deploy\\Kaadu.Deploy.csproj",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Kaadu.Deploy.csproj",
+              "RelativeToolTip": "Kaadu.Deploy\\Kaadu.Deploy.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2026-01-20T21:48:02.143Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "MainWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\MainWindow.xaml.cs",
+              "RelativeDocumentMoniker": "Kaadu\\MainWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\MainWindow.xaml.cs",
+              "RelativeToolTip": "Kaadu\\MainWindow.xaml.cs",
+              "ViewState": "AgIAAE0BAAAAAAAAAAAuwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:48:02.015Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 17,
+              "Title": "ILauncherUpdateService.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\ILauncherUpdateService.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Services\\ILauncherUpdateService.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\ILauncherUpdateService.cs",
+              "RelativeToolTip": "Kaadu\\Services\\ILauncherUpdateService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:48:01.928Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 16,
+              "Title": "LauncherVersionInfo.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\LauncherVersionInfo.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Models\\LauncherVersionInfo.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\LauncherVersionInfo.cs",
+              "RelativeToolTip": "Kaadu\\Models\\LauncherVersionInfo.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:48:01.843Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 15,
+              "Title": "deploy.ps1",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\deploy.ps1",
+              "RelativeDocumentMoniker": "deploy.ps1",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\deploy.ps1",
+              "RelativeToolTip": "deploy.ps1",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2026-01-20T21:48:01.741Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "MainWindow.xaml",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\MainWindow.xaml",
+              "RelativeDocumentMoniker": "Kaadu\\MainWindow.xaml",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\MainWindow.xaml",
+              "RelativeToolTip": "Kaadu\\MainWindow.xaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2026-01-20T21:48:01.374Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 14,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Program.cs",
+              "RelativeDocumentMoniker": "Kaadu.Deploy\\Program.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu.Deploy\\Program.cs",
+              "RelativeToolTip": "Kaadu.Deploy\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:48:01.246Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "LauncherUpdateService.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\LauncherUpdateService.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Services\\LauncherUpdateService.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Services\\LauncherUpdateService.cs",
+              "RelativeToolTip": "Kaadu\\Services\\LauncherUpdateService.cs",
+              "ViewState": "AgIAABAAAAAAAAAAAAAWwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:48:01.025Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "AppConfiguration.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\AppConfiguration.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Models\\AppConfiguration.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\AppConfiguration.cs",
+              "RelativeToolTip": "Kaadu\\Models\\AppConfiguration.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAF8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:44:32.849Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "UserSettings.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\UserSettings.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Models\\UserSettings.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Models\\UserSettings.cs",
+              "RelativeToolTip": "Kaadu\\Models\\UserSettings.cs",
+              "ViewState": "AgIAAA4AAAAAAAAAAAAQwCkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T21:42:13.625Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "AdminConsoleWindow.xaml.cs",
+              "DocumentMoniker": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\AdminConsoleWindow.xaml.cs",
+              "RelativeDocumentMoniker": "Kaadu\\Views\\AdminConsoleWindow.xaml.cs",
+              "ToolTip": "C:\\Users\\jojoj\\source\\repos\\Kaadu\\Kaadu\\Views\\AdminConsoleWindow.xaml.cs",
+              "RelativeToolTip": "Kaadu\\Views\\AdminConsoleWindow.xaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-20T17:15:05.943Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

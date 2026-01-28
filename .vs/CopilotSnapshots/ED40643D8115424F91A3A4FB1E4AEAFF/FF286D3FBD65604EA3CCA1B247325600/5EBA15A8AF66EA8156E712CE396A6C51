@@ -1,0 +1,142 @@
+﻿using System.Windows;
+using System.Windows.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+using Kaadu.ViewModels;
+
+namespace Kaadu;
+
+/// <summary>
+/// Main application window with custom chrome and view navigation.
+/// </summary>
+public partial class MainWindow : Window
+{
+    private readonly INavigationService _navigationService;
+    private readonly IAuthService _authService;
+    private readonly IAdminService _adminService;
+    private readonly ISftpService _sftpService;
+    private readonly IHashService _hashService;
+    private readonly IUpdateService _updateService;
+
+    private UserSession _currentSession = UserSession.Unauthenticated;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        // Initialize services
+        _adminService = new AdminService();
+        _authService = new AuthService(_adminService);
+        _sftpService = new SftpService();
+        _hashService = new HashService();
+        _updateService = new UpdateService(_sftpService, _hashService);
+
+        // Initialize navigation service with view model factories
+        _navigationService = new NavigationService(
+            CreateLoginViewModel,
+            CreateLauncherViewModel,
+            CreateAdminViewModel);
+
+        // Subscribe to navigation events
+        _navigationService.Navigated += OnNavigated;
+
+        // Set initial data context
+        DataContext = this;
+
+        // Navigate to login on startup
+        _navigationService.NavigateToLogin();
+    }
+
+    /// <summary>
+    /// Gets the current view model for binding.
+    /// </summary>
+    public ViewModelBase? CurrentViewModel => _navigationService.CurrentViewModel;
+
+    private LoginViewModel CreateLoginViewModel()
+    {
+        return new LoginViewModel(_authService, _navigationService, _sftpService, OnLoginSuccess);
+    }
+
+    private LauncherViewModel CreateLauncherViewModel()
+    {
+        return new LauncherViewModel(_updateService, _navigationService, _currentSession);
+    }
+
+    private AdminViewModel CreateAdminViewModel()
+    {
+        return new AdminViewModel(_updateService, _navigationService, _currentSession);
+    }
+
+    private void OnLoginSuccess(UserSession session)
+    {
+        _currentSession = session;
+    }
+
+    private void OnNavigated(object? sender, ViewModelBase viewModel)
+    {
+        // Notify binding system of view model change
+        OnPropertyChanged(nameof(CurrentViewModel));
+    }
+
+    private void OnPropertyChanged(string propertyName)
+    {
+        // Manual property changed notification for simple case
+        Dispatcher.Invoke(() =>
+        {
+            var binding = GetBindingExpression(DataContextProperty);
+            binding?.UpdateTarget();
+
+            // Force content update
+            DataContext = null;
+            DataContext = this;
+        });
+    }
+
+    #region Window Chrome Handlers
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximize();
+        }
+        else
+        {
+            DragMove();
+        }
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleMaximize();
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Cleanup services
+        if (_authService is IDisposable authDisposable)
+            authDisposable.Dispose();
+
+        if (_adminService is IDisposable adminDisposable)
+            adminDisposable.Dispose();
+
+        if (_sftpService is IDisposable sftpDisposable)
+            sftpDisposable.Dispose();
+
+        Close();
+    }
+
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+    }
+
+    #endregion
+}

@@ -1,0 +1,206 @@
+﻿<UserControl x:Class="Kaadu.Views.AdminView"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+         xmlns:vm="clr-namespace:Kaadu.ViewModels"
+         mc:Ignorable="d"
+         d:DesignHeight="600" d:DesignWidth="900"
+         d:DataContext="{d:DesignInstance Type=vm:AdminViewModel}">
+
+<Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource SecondaryBackgroundBrush}"
+                Padding="24,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="⚙"
+                               FontSize="24"
+                               Foreground="{StaticResource AccentBrush}"
+                               VerticalAlignment="Center"/>
+                    <StackPanel Margin="12,0,0,0">
+                        <TextBlock Text="Admin Panel"
+                                   Style="{StaticResource HeadingStyle}"
+                                   FontSize="20"/>
+                        <TextBlock Style="{StaticResource StatusTextStyle}" FontSize="12">
+                            <Run Text="Logged in as "/>
+                            <Run Text="{Binding Username, Mode=OneWay}" Foreground="{StaticResource AccentBrush}"/>
+                            <Run Text=" (Level "/>
+                            <Run Text="{Binding AdminLevel, Mode=OneWay}"/>
+                            <Run Text=")"/>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="← Back to Launcher"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding BackToLauncherCommand}"
+                        Padding="16,8"/>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="400"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Panel - Controls -->
+            <Border Grid.Column="0" 
+                    Style="{StaticResource CardStyle}"
+                    Margin="0,0,12,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                    <TextBlock Text="Maintenance Actions"
+                               Style="{StaticResource HeadingStyle}"
+                               FontSize="16"
+                               Margin="0,0,0,20"/>
+
+                    <!-- Force Update -->
+                    <Button Content="Force Update"
+                            Style="{StaticResource BaseButtonStyle}"
+                            Command="{Binding ForceUpdateCommand}"
+                            Margin="0,0,0,12"
+                            HorizontalAlignment="Stretch"/>
+
+                    <!-- Repair Game -->
+                    <Button Content="Repair Game Files"
+                            Style="{StaticResource BaseButtonStyle}"
+                            Command="{Binding RepairGameCommand}"
+                            Margin="0,0,0,12"
+                            HorizontalAlignment="Stretch"/>
+
+                    <!-- Reinstall Base -->
+                    <Button Content="Reinstall Base Game"
+                            Style="{StaticResource DangerButtonStyle}"
+                            Command="{Binding ReinstallBaseCommand}"
+                            Margin="0,0,0,24"
+                            HorizontalAlignment="Stretch"/>
+
+                    <!-- Cancel Button -->
+                    <Button Content="Cancel Operation"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding CancelOperationCommand}"
+                            IsEnabled="{Binding IsOperationRunning}"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,24"/>
+
+                    <!-- Progress -->
+                    <StackPanel Visibility="{Binding IsOperationRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
+                                   Style="{StaticResource StatusTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,8"/>
+                        <ProgressBar Style="{StaticResource ModernProgressBarStyle}"
+                                     Value="{Binding Progress, Mode=OneWay}"
+                                     Maximum="100"/>
+                    </StackPanel>
+
+                    <!-- Separator -->
+                    <Rectangle Height="1" 
+                               Fill="{StaticResource BorderBrush}" 
+                               Margin="0,12"/>
+
+
+                    <!-- Manifest Generation (Server Admin) -->
+                    <Border BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="12"
+                            Margin="0,12,0,16"
+                            Background="{StaticResource SecondaryBackgroundBrush}">
+                        <StackPanel>
+                            <TextBlock Text="Server Management: Update Manifest"
+                                       Style="{StaticResource HeadingStyle}"
+                                       FontSize="15"
+                                       Margin="0,0,0,8"/>
+                            <TextBlock Text="This will scan /upload/updates/, compute hashes, and upload update_manifest.json to /upload/config/."
+                                       Style="{StaticResource StatusTextStyle}"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Version: "
+                                           Style="{StaticResource FormLabelStyle}"
+                                           Margin="0,0,8,0"
+                                           VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding ManifestVersion, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBoxStyle}"
+                                         Width="80"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,8,0"/>
+                                <Button Content="Update Manifest"
+                                        Style="{StaticResource PrimaryButtonStyle}"
+                                        Command="{Binding GenerateManifestCommand}"
+                                        ToolTip="Scan /upload/updates/, compute hashes, and upload manifest to /upload/config/update_manifest.json."
+                                        Padding="16,6"
+                                        VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Separator -->
+                    <Rectangle Height="1" 
+                               Fill="{StaticResource BorderBrush}" 
+                               Margin="0,12"/>
+
+                    <!-- Utility Actions -->
+                    <TextBlock Text="Utilities"
+                               Style="{StaticResource HeadingStyle}"
+                               FontSize="16"
+                               Margin="0,12,0,16"/>
+
+                    <Button Content="Open Install Folder"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenInstallFolderCommand}"
+                            HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Right Panel - Log Viewer -->
+            <Border Grid.Column="1" 
+                    Style="{StaticResource CardStyle}"
+                    Margin="12,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" Margin="0,0,0,16">
+                        <TextBlock Text="Activity Log"
+                                   Style="{StaticResource HeadingStyle}"
+                                   FontSize="16"/>
+                        <Button Content="Clear"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding ClearLogsCommand}"
+                                HorizontalAlignment="Right"
+                                Padding="12,6"
+                                FontSize="12"/>
+                    </Grid>
+
+                    <ListBox Grid.Row="1"
+                             Style="{StaticResource LogListBoxStyle}"
+                             ItemContainerStyle="{StaticResource LogListBoxItemStyle}"
+                             ItemsSource="{Binding LogEntries}"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

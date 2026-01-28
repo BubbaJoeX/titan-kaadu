@@ -1,0 +1,75 @@
+﻿using System.Net.Http;
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Implementation of admin service for checking user permission levels.
+/// </summary>
+public sealed class AdminService : IAdminService, IDisposable
+{
+    private readonly HttpClient _httpClient;
+    private bool _disposed;
+
+    public AdminService()
+    {
+        _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+    }
+
+    public async Task<int> GetAdminLevelAsync(string username, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(username);
+
+        try
+        {
+            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["user_name"] = username
+            });
+
+            var response = await _httpClient.PostAsync(AppConfiguration.AdminCheckerUrl, content, cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return 0;
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            // Try to parse admin level from response
+            if (int.TryParse(responseContent.Trim(), out var level))
+            {
+                return level;
+            }
+
+            // Try to extract from JSON if structured response
+            if (responseContent.Contains("admin_level", StringComparison.OrdinalIgnoreCase))
+            {
+                // Simple extraction - adjust based on actual API format
+                var match = System.Text.RegularExpressions.Regex.Match(responseContent, @"""admin_level""\s*:\s*(\d+)");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var jsonLevel))
+                {
+                    return jsonLevel;
+                }
+            }
+
+            return 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _httpClient.Dispose();
+            _disposed = true;
+        }
+    }
+}

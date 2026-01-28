@@ -1,0 +1,344 @@
+﻿using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+
+namespace Kaadu.ViewModels;
+
+/// <summary>
+/// ViewModel for the main launcher screen.
+/// </summary>
+public sealed partial class LauncherViewModel : ViewModelBase
+{
+    private readonly IUpdateService _updateService;
+    private readonly INavigationService _navigationService;
+    private readonly ISettingsService _settingsService;
+    private readonly ICharacterService _characterService;
+    private readonly UserSession _userSession;
+    private CancellationTokenSource? _updateCts;
+
+    [ObservableProperty]
+    private string _currentVersion = "Unknown";
+
+    [ObservableProperty]
+    private string _latestVersion = "Unknown";
+
+    [ObservableProperty]
+    private UpdateStatus _status = UpdateStatus.Idle;
+
+    [ObservableProperty]
+    private string _statusMessage = "Initializing...";
+
+    [ObservableProperty]
+    private double _progress;
+
+    [ObservableProperty]
+    private bool _canPlay;
+
+    [ObservableProperty]
+    private bool _isUpdating;
+
+    [ObservableProperty]
+    private bool _showAdminButton;
+
+    [ObservableProperty]
+    private bool _showSetupButton;
+
+    [ObservableProperty]
+    private List<CharacterInfo> _characters = new();
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PlayCommand))]
+    private CharacterInfo? _selectedCharacter;
+
+    [ObservableProperty]
+    private bool _hasCharacters;
+
+    public LauncherViewModel(
+        IUpdateService updateService,
+        INavigationService navigationService,
+        ISettingsService settingsService,
+        ICharacterService characterService,
+        UserSession userSession)
+    {
+        _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+        _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
+        _characterService = characterService ?? throw new ArgumentNullException(nameof(characterService));
+        _userSession = userSession ?? throw new ArgumentNullException(nameof(userSession));
+
+        ShowAdminButton = userSession.IsAdmin;
+        ShowSetupButton = false; // Visibility determined by HasRunSetup check during update flow
+
+        // Subscribe to update service events
+        _updateService.StatusChanged += OnStatusChanged;
+        _updateService.ProgressChanged += OnProgressChanged;
+        _updateService.StatusMessageChanged += OnStatusMessageChanged;
+
+        // Automatically start checking for updates/installing when view model is created
+        _ = InitializeOnLoadAsync();
+    }
+
+    private async Task InitializeOnLoadAsync()
+    {
+        // Small delay to allow UI to render first
+        await Task.Delay(100).ConfigureAwait(true);
+        await CheckForUpdatesAsync(CancellationToken.None).ConfigureAwait(true);
+        
+        // Load character list after updates are checked
+        await LoadCharactersAsync().ConfigureAwait(true);
+    }
+
+    private async Task LoadCharactersAsync()
+    {
+        try
+        {
+            var characters = await _characterService.GetCharactersAsync(_userSession.Username).ConfigureAwait(true);
+            Characters = characters;
+            HasCharacters = characters.Count > 0;
+            
+            // Auto-select first character if available
+            if (HasCharacters)
+            {
+                SelectedCharacter = characters[0];
+            }
+        }
+        catch (Exception ex)
+        {
+            // If character loading fails, log and continue without characters
+            System.Diagnostics.Debug.WriteLine($"Failed to load characters: {ex.Message}");
+            HasCharacters = false;
+        }
+    }
+
+    public string Username => _userSession.Username;
+    public int AdminLevel => _userSession.AdminLevel;
+
+    [RelayCommand]
+    private async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        await CheckForUpdatesAsync(cancellationToken);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecutePlay))]
+    private async Task PlayAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            
+            // Use auto-login if credentials are available
+            if (!string.IsNullOrEmpty(_userSession.Password) && 
+                !string.IsNullOrEmpty(_userSession.ServerAddress))
+            {
+                // Use selected character name if available
+                var characterName = SelectedCharacter?.CharacterName;
+                
+                await _updateService.LaunchGameWithAutoLoginAsync(
+                    _userSession.Username,
+                    _userSession.Password,
+                    _userSession.ServerAddress,
+                    characterName).ConfigureAwait(true);
+            }
+            else
+            {
+                await _updateService.LaunchGameAsync().ConfigureAwait(true);
+            }
+
+            // Optionally close launcher after launching game
+            // Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            SetError($"Failed to launch game: {ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanExecutePlay() => CanPlay && !IsBusy && !IsUpdating;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteOpenSetup))]
+    private async Task OpenSetupAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            ShowSetupButton = false;
+            Status = UpdateStatus.Idle;
+            StatusMessage = "Opening setup...";
+
+            await _updateService.OpenSetupExecutableAsync().ConfigureAwait(true);
+            
+            // Mark setup as complete
+            await _settingsService.MarkSetupCompleteAsync().ConfigureAwait(true);
+            
+            // Load characters after setup (character list may be created during setup)
+            await LoadCharactersAsync().ConfigureAwait(true);
+            
+            // Show play button after setup completes
+            CanPlay = true;
+            Status = UpdateStatus.Ready;
+            StatusMessage = "Setup complete! Ready to play.";
+        }
+        catch (Exception ex)
+        {
+            SetError($"Failed to open setup: {ex.Message}");
+            ShowSetupButton = true; // Show button again if there was an error
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanExecuteOpenSetup() => ShowSetupButton && !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteCheckUpdate))]
+    private async Task CheckForUpdatesAsync(CancellationToken cancellationToken)
+    {
+        if (IsUpdating)
+            return;
+
+        _updateCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsUpdating = true;
+        CanPlay = false;
+        ShowSetupButton = false;
+        ClearError();
+
+        try
+        {
+            // Get current local version
+            CurrentVersion = await _updateService.GetLocalVersionAsync(_updateCts.Token).ConfigureAwait(true);
+
+            // Get remote manifest
+            var manifest = await _updateService.GetRemoteManifestAsync(_updateCts.Token).ConfigureAwait(true);
+            LatestVersion = manifest?.LatestVersion ?? "Unknown";
+
+            // Perform update check
+            var success = await _updateService.CheckAndUpdateAsync(_updateCts.Token).ConfigureAwait(true);
+
+            if (success)
+            {
+                CurrentVersion = LatestVersion;
+                
+                // Check if this is first time and setup hasn't been run yet
+                if (!_settingsService.HasRunSetup)
+                {
+                    // Show setup button for first-time installation
+                    ShowSetupButton = true;
+                    CanPlay = false;
+                    Status = UpdateStatus.Ready;
+                    StatusMessage = "Installation complete! Please run setup before playing.";
+                }
+                else
+                {
+                    // Setup already run, can play directly
+                    CanPlay = true;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Update cancelled.";
+        }
+        catch (Exception ex)
+        {
+            SetError($"Update error: {ex.Message}");
+        }
+        finally
+        {
+            IsUpdating = false;
+            _updateCts?.Dispose();
+            _updateCts = null;
+            PlayCommand.NotifyCanExecuteChanged();
+            OpenSetupCommand.NotifyCanExecuteChanged();
+            CheckForUpdatesCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanExecuteCheckUpdate() => !IsUpdating && !IsBusy;
+
+    [RelayCommand]
+    private void CancelUpdate()
+    {
+        _updateCts?.Cancel();
+    }
+
+    [RelayCommand]
+    private void OpenAdmin()
+    {
+        if (_userSession.IsAdmin)
+        {
+            _navigationService.NavigateToAdmin();
+        }
+    }
+
+    [RelayCommand]
+    private void Logout()
+    {
+        _updateCts?.Cancel();
+        _navigationService.NavigateToLogin();
+    }
+
+    private void OnStatusChanged(object? sender, UpdateStatus status)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Status = status;
+            
+            // Only enable play button if setup has been run (or not needed)
+            if (status == UpdateStatus.Ready)
+            {
+                if (!_settingsService.HasRunSetup)
+                {
+                    ShowSetupButton = true;
+                    CanPlay = false;
+                }
+                else
+                {
+                    CanPlay = true;
+                    ShowSetupButton = false;
+                }
+            }
+            else
+            {
+                CanPlay = false;
+            }
+            
+            PlayCommand.NotifyCanExecuteChanged();
+            OpenSetupCommand.NotifyCanExecuteChanged();
+        });
+    }
+
+    private void OnProgressChanged(object? sender, double progress)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Progress = progress;
+        });
+    }
+
+    private void OnStatusMessageChanged(object? sender, string message)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            StatusMessage = message;
+        });
+    }
+
+    /// <summary>
+    /// Cleanup when navigating away.
+    /// </summary>
+    public void Cleanup()
+    {
+        _updateService.StatusChanged -= OnStatusChanged;
+        _updateService.ProgressChanged -= OnProgressChanged;
+        _updateService.StatusMessageChanged -= OnStatusMessageChanged;
+        _updateCts?.Cancel();
+        _updateCts?.Dispose();
+    }
+}

@@ -1,0 +1,185 @@
+﻿using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Service for checking and applying launcher self-updates.
+/// </summary>
+public sealed class LauncherUpdateService : ILauncherUpdateService
+{
+    private readonly ISftpService _sftpService;
+
+    public LauncherUpdateService(ISftpService sftpService)
+    {
+        _sftpService = sftpService ?? throw new ArgumentNullException(nameof(sftpService));
+    }
+
+    public string LocalVersion => AppConfiguration.LauncherVersion;
+
+    public event EventHandler<double>? ProgressChanged;
+    public event EventHandler<string>? StatusChanged;
+
+    public async Task<LauncherVersionInfo?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            SetStatus("Checking for launcher updates...");
+
+            var json = await _sftpService.DownloadTextAsync(AppConfiguration.LauncherVersionPath, cancellationToken).ConfigureAwait(false);
+            var remoteVersion = JsonSerializer.Deserialize<LauncherVersionInfo>(json);
+
+            if (remoteVersion == null || string.IsNullOrEmpty(remoteVersion.Version))
+            {
+                SetStatus("No launcher version info available.");
+                return null;
+            }
+
+            // Compare versions
+            if (IsNewerVersion(remoteVersion.Version, LocalVersion))
+            {
+                SetStatus($"Launcher update available: v{remoteVersion.Version}");
+                return remoteVersion;
+            }
+
+            // Check minimum version requirement
+            if (!string.IsNullOrEmpty(remoteVersion.MinimumVersion) && 
+                IsNewerVersion(remoteVersion.MinimumVersion, LocalVersion))
+            {
+                SetStatus($"Required launcher update: v{remoteVersion.Version}");
+                return remoteVersion;
+            }
+
+            SetStatus("Launcher is up to date.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to check launcher update: {ex.Message}");
+            SetStatus("Could not check for launcher updates.");
+            return null;
+        }
+    }
+
+    public async Task<bool> DownloadAndApplyUpdateAsync(LauncherVersionInfo versionInfo, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(versionInfo);
+
+        try
+        {
+            SetStatus($"Downloading launcher v{versionInfo.Version}...");
+            SetProgress(0);
+
+            // Build remote path: /upload/launcher/v1.0.2/Kaadu.exe
+            var remotePath = $"{AppConfiguration.LauncherBinariesPath}v{versionInfo.Version}/{versionInfo.Filename}";
+            
+            // Download to temp location
+            var tempPath = Path.Combine(Path.GetTempPath(), $"Kaadu_v{versionInfo.Version}.exe");
+            
+            await _sftpService.DownloadFileAsync(remotePath, tempPath, progress =>
+            {
+                SetProgress(progress * 0.9); // Reserve 10% for file operations
+            }, cancellationToken).ConfigureAwait(false);
+
+            SetProgress(90);
+            SetStatus("Preparing update...");
+
+            // Get current executable path
+            var currentExePath = AppConfiguration.LauncherExecutablePath;
+            var launcherDir = AppConfiguration.LauncherDirectory;
+            var backupPath = Path.Combine(launcherDir, "Kaadu.exe.old");
+            var newExePath = Path.Combine(launcherDir, "Kaadu.exe");
+
+            // Create update script that will:
+            // 1. Wait for current process to exit
+            // 2. Replace the executable
+            // 3. Start the new version
+            // 4. Clean up
+            var updateScript = CreateUpdateScript(currentExePath, tempPath, newExePath, backupPath);
+            var scriptPath = Path.Combine(Path.GetTempPath(), "kaadu_update.cmd");
+            await File.WriteAllTextAsync(scriptPath, updateScript, cancellationToken).ConfigureAwait(false);
+
+            SetProgress(95);
+            SetStatus("Starting update process...");
+
+            // Start the update script
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c \"{scriptPath}\"",
+                UseShellExecute = true,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(psi);
+
+            SetProgress(100);
+            SetStatus("Update ready. Restarting...");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to download launcher update: {ex.Message}");
+            SetStatus($"Update failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static string CreateUpdateScript(string currentExe, string tempExe, string targetExe, string backupExe)
+    {
+        var currentPid = Environment.ProcessId;
+        
+        return $"""
+            @echo off
+            echo Waiting for launcher to close...
+            :waitloop
+            tasklist /FI "PID eq {currentPid}" 2>NUL | find /I "{currentPid}" >NUL
+            if "%ERRORLEVEL%"=="0" (
+                timeout /t 1 /nobreak >NUL
+                goto waitloop
+            )
+            
+            echo Applying update...
+            if exist "{backupExe}" del /f /q "{backupExe}"
+            if exist "{targetExe}" move /y "{targetExe}" "{backupExe}"
+            move /y "{tempExe}" "{targetExe}"
+            
+            echo Starting updated launcher...
+            start "" "{targetExe}"
+            
+            echo Cleaning up...
+            timeout /t 2 /nobreak >NUL
+            if exist "{backupExe}" del /f /q "{backupExe}"
+            del /f /q "%~f0"
+            """;
+    }
+
+    private static bool IsNewerVersion(string remote, string local)
+    {
+        try
+        {
+            var remoteVersion = Version.Parse(remote.TrimStart('v', 'V'));
+            var localVersion = Version.Parse(local.TrimStart('v', 'V'));
+            return remoteVersion > localVersion;
+        }
+        catch
+        {
+            // If parsing fails, do string comparison
+            return string.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
+        }
+    }
+
+    private void SetProgress(double progress)
+    {
+        ProgressChanged?.Invoke(this, progress);
+    }
+
+    private void SetStatus(string message)
+    {
+        StatusChanged?.Invoke(this, message);
+    }
+}

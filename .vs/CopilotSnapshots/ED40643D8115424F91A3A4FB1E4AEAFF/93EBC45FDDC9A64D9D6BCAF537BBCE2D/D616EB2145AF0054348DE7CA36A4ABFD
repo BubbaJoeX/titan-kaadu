@@ -1,0 +1,24 @@
+﻿using System.Windows;
+using System.Windows.Controls;
+using Kaadu.ViewModels;
+
+namespace Kaadu.Views;
+
+/// <summary>
+/// Interaction logic for LauncherView.xaml
+/// </summary>
+public partial class LauncherView : UserControl
+{
+    public LauncherView()
+    {
+        InitializeComponent();
+    }
+
+    private async void UserControl_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is LauncherViewModel viewModel)
+        {
+            await viewModel.InitializeCommand.ExecuteAsync(null);
+        }
+    }
+}

@@ -1,0 +1,12 @@
+﻿namespace Kaadu.Models;
+
+/// <summary>
+/// Represents a file entry in the update manifest with path and checksum.
+/// </summary>
+public sealed record FileEntry(string Path, string Checksum)
+{
+    /// <summary>
+    /// Gets the file size in bytes (populated during download).
+    /// </summary>
+    public long Size { get; init; }
+}

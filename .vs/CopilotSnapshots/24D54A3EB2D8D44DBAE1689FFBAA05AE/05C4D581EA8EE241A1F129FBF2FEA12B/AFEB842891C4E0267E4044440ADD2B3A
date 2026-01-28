@@ -1,0 +1,106 @@
+﻿<UserControl x:Class="Kaadu.Views.InstallPathView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:Kaadu.ViewModels"
+             mc:Ignorable="d"
+             d:DesignHeight="600" d:DesignWidth="900"
+             d:DataContext="{d:DesignInstance Type=vm:InstallPathViewModel}">
+
+    <Grid Background="{StaticResource PrimaryBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Install Path Card -->
+        <Border Grid.Row="1" 
+                Style="{StaticResource CardStyle}"
+                MaxWidth="550"
+                Margin="40">
+            <StackPanel>
+                <!-- Title -->
+                <TextBlock Text="Select Installation Location"
+                           Style="{StaticResource HeadingStyle}"
+                           HorizontalAlignment="Center"
+                           FontSize="24"
+                           Margin="0,0,0,8"/>
+                
+                <TextBlock Text="Choose where to install the game files"
+                           Style="{StaticResource SubheadingStyle}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,32"/>
+
+                <!-- Install Path -->
+                <TextBlock Text="INSTALLATION PATH"
+                           Style="{StaticResource FormLabelStyle}"/>
+                
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBox Grid.Column="0"
+                             Style="{StaticResource ModernTextBoxStyle}"
+                             Text="{Binding InstallPath, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,0,8,0"/>
+                    
+                    <Button Grid.Column="1"
+                            Content="Browse..."
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding BrowseCommand}"
+                            Padding="16,8"/>
+                </Grid>
+
+                <!-- Default Path Info -->
+                <TextBlock TextWrapping="Wrap"
+                           Margin="0,0,0,24"
+                           Opacity="0.7">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
+                            <Setter Property="Text" Value="Default location will be used if left unchanged."/>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Status Message -->
+                <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,16">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource StatusTextStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <!-- Buttons -->
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Button Grid.Column="0"
+                            Content="USE DEFAULT"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding UseDefaultCommand}"/>
+                    
+                    <Button Grid.Column="2"
+                            Content="CONTINUE"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Command="{Binding ContinueCommand}"/>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

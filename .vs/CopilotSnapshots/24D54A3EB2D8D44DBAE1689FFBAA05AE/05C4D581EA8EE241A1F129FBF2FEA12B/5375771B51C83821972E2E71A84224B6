@@ -1,0 +1,250 @@
+﻿<UserControl x:Class="Kaadu.Views.LauncherView"
+         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+         xmlns:vm="clr-namespace:Kaadu.ViewModels"
+         mc:Ignorable="d"
+         d:DesignHeight="960" d:DesignWidth="1224"
+         d:DataContext="{d:DesignInstance Type=vm:LauncherViewModel}"
+         MinHeight="600" MinWidth="800">
+
+<Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*" MinHeight="300"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource SecondaryBackgroundBrush}"
+                Padding="24,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- User Info -->
+                <StackPanel Grid.Column="0" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center">
+                    <Ellipse Width="40" 
+                             Height="40" 
+                             Fill="{StaticResource TertiaryBackgroundBrush}">
+                        <Ellipse.Effect>
+                            <DropShadowEffect BlurRadius="10" 
+                                              ShadowDepth="0" 
+                                              Opacity="0.3"/>
+                        </Ellipse.Effect>
+                    </Ellipse>
+                    <StackPanel Margin="12,0,0,0" 
+                                VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Username, Mode=OneWay}"
+                                   Style="{StaticResource StatusTextStyle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="Welcome back!"
+                                   Style="{StaticResource StatusTextStyle}"
+                                   FontSize="12"
+                                   Opacity="0.7"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Header Buttons -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal">
+                    <Button Content="📁 Directory"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding ChangeDirectoryCommand}"
+                            ToolTip="Change game installation directory"
+                            Padding="16,8"
+                            Margin="0,0,12,0"/>
+                    <Button Content="📋 Console"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenConsoleCommand}"
+                            ToolTip="Open admin console"
+                            Visibility="{Binding ShowAdminConsole, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Padding="16,8"
+                            Margin="0,0,12,0"/>
+                    <Button Content="⚙ Admin"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding OpenAdminCommand}"
+                            Visibility="{Binding ShowAdminButton, Converter={StaticResource BoolToVisibilityConverter}}"
+                            Padding="16,8"
+                            Margin="0,0,12,0"/>
+                    <Button Content="Logout"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding LogoutCommand}"
+                            Padding="16,8"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content - Scrollable for flexibility -->
+        <ScrollViewer Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0">
+            <Grid Margin="60,24,60,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Game Branding Area -->
+                <StackPanel Grid.Row="0" 
+                            VerticalAlignment="Center" 
+                            HorizontalAlignment="Center">
+                    <!-- Logo -->
+                    <Image x:Name="GameLogoImage"
+                           Source="/Assets/TITAN_LOGO.png"
+                           MaxWidth="280"
+                           MaxHeight="280"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           ImageFailed="GameLogoImage_ImageFailed">
+                        <Image.Effect>
+                            <DropShadowEffect Color="{StaticResource AccentColor}" 
+                                              BlurRadius="30" 
+                                              ShadowDepth="0" 
+                                              Opacity="0.5"/>
+                        </Image.Effect>
+                    </Image>
+                    <TextBlock Text="Next stop, Tansarii Point Station!"
+                               Style="{StaticResource SubheadingStyle}"
+                               FontSize="20"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,24"/>
+                </StackPanel>
+
+                <!-- Controls Section -->
+                <StackPanel Grid.Row="1"
+                            VerticalAlignment="Top"
+                            HorizontalAlignment="Center">
+                    
+                    <!-- Status & Progress Section -->
+                    <StackPanel Margin="0,0,0,20">
+                        <!-- Status Message -->
+                        <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
+                                   Style="{StaticResource StatusTextStyle}"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="600"
+                                   Margin="0,0,0,12"/>
+                        
+                        <!-- Progress Bar (visible when updating) -->
+                        <StackPanel Visibility="{Binding IsUpdating, Converter={StaticResource BoolToVisibilityConverter}}"
+                                    MaxWidth="500"
+                                    MinWidth="300"
+                                    HorizontalAlignment="Center">
+                            
+                            <!-- Progress percentage -->
+                            <TextBlock Text="{Binding Progress, StringFormat={}{0:F0}%, Mode=OneWay}"
+                                       Style="{StaticResource StatusTextStyle}"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            
+                            <!-- Progress bar -->
+                            <ProgressBar Style="{StaticResource ModernProgressBarStyle}"
+                                         Value="{Binding Progress, Mode=OneWay}"
+                                         Maximum="100"
+                                         Height="12"/>
+                            
+                            <!-- Cancel button -->
+                            <Button Content="Cancel"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Command="{Binding CancelUpdateCommand}"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,12,0,0"
+                                    Padding="16,6"
+                                    FontSize="12"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Character Selection -->
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,16"
+                                Visibility="{Binding HasCharacters, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="Character:"
+                                   Style="{StaticResource StatusTextStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"/>
+                        <ComboBox ItemsSource="{Binding Characters}"
+                                  SelectedItem="{Binding SelectedCharacter, Mode=TwoWay}"
+                                  DisplayMemberPath="DisplayName"
+                                  Style="{StaticResource ModernComboBoxStyle}"
+                                  MinWidth="220"/>
+                    </StackPanel>
+
+                    <!-- Action Buttons Container -->
+                    <StackPanel HorizontalAlignment="Center">
+                        <!-- Setup Button (first-time only) -->
+                        <Button Content="⚙ Run Setup"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding OpenSetupCommand}"
+                                HorizontalAlignment="Center"
+                                MinWidth="200"
+                                Margin="0,0,0,12"
+                                Visibility="{Binding ShowSetupButton, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <!-- Play Button -->
+                        <Button Content="PLAY"
+                                Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding PlayCommand}"
+                                HorizontalAlignment="Center"
+                                MinWidth="200"
+                                Visibility="{Binding CanPlay, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                        <!-- Check for Updates Button -->
+                        <Button Content="Check for Updates"
+                                Command="{Binding CheckForUpdatesCommand}"
+                                HorizontalAlignment="Center"
+                                Margin="0,12,0,0"
+                                Padding="20,10">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsUpdating}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding CanPlay}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Footer -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SecondaryBackgroundBrush}"
+                Padding="24,12">
+            <Grid>
+                <TextBlock Text="© 2026 SWG Titan"
+                           Style="{StaticResource StatusTextStyle}"
+                           FontSize="11"
+                           Opacity="0.5"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"/>
+                <TextBlock Text="swgtitan.org"
+                           Style="{StaticResource StatusTextStyle}"
+                           FontSize="11"
+                           Foreground="{StaticResource AccentBrush}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Cursor="Hand"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

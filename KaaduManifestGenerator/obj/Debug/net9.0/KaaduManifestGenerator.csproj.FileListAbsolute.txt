@@ -1,0 +1,15 @@
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\bin\Debug\net9.0\kaadu-manifest.exe
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\bin\Debug\net9.0\kaadu-manifest.deps.json
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\bin\Debug\net9.0\kaadu-manifest.runtimeconfig.json
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\bin\Debug\net9.0\kaadu-manifest.dll
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\bin\Debug\net9.0\kaadu-manifest.pdb
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.AssemblyInfoInputs.cache
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.AssemblyInfo.cs
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.csproj.CoreCompileInputs.cache
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\kaadu-manifest.dll
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\refint\kaadu-manifest.dll
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\kaadu-manifest.pdb
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.genruntimeconfig.cache
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\ref\kaadu-manifest.dll
+C:\Users\jojoj\source\repos\Kaadu\KaaduManifestGenerator\obj\Debug\net9.0\KaaduManifestGenerator.sourcelink.json

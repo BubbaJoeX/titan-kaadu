@@ -1,0 +1,88 @@
+using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+
+namespace Kaadu.ViewModels;
+
+/// <summary>
+/// ViewModel for the login screen.
+/// </summary>
+public sealed partial class LoginViewModel : ViewModelBase
+{
+    private readonly IAuthService _authService;
+    private readonly Action<UserSession> _onLoginSuccess;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
+    private string _username = string.Empty;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoginCommand))]
+    private string _password = string.Empty;
+
+    [ObservableProperty]
+    private string _statusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _isStatusError;
+
+    public LoginViewModel(
+        IAuthService authService,
+        Action<UserSession> onLoginSuccess)
+    {
+        _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _onLoginSuccess = onLoginSuccess ?? throw new ArgumentNullException(nameof(onLoginSuccess));
+    }
+
+    private bool CanLogin => !string.IsNullOrWhiteSpace(Username) && 
+                              !string.IsNullOrWhiteSpace(Password) && 
+                              !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanLogin))]
+    private async Task LoginAsync(CancellationToken cancellationToken)
+    {
+        ClearError();
+        SetStatus("Authenticating...", isError: false);
+        IsBusy = true;
+
+        try
+        {
+            var result = await _authService.AuthenticateAsync(Username, Password, cancellationToken).ConfigureAwait(true);
+
+            if (!result.Success || result.Session == null)
+            {
+                SetStatus(result.ErrorMessage ?? "Authentication failed.", isError: true);
+                return;
+            }
+
+            SetStatus("Login successful!", isError: false);
+
+            // Notify main window of successful login - MainWindow handles post-login navigation
+            _onLoginSuccess(result.Session);
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus("Login cancelled.", isError: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Login error: {ex.Message}", isError: true);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        StatusMessage = message;
+        IsStatusError = isError;
+        if (isError)
+        {
+            SetError(message);
+        }
+    }
+}

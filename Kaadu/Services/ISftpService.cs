@@ -1,0 +1,69 @@
+namespace Kaadu.Services;
+
+/// <summary>
+/// Represents a remote file with metadata.
+/// </summary>
+public sealed record RemoteFileInfo(string Path, string Name, long Size);
+
+/// <summary>
+/// Service for SFTP file operations.
+/// </summary>
+public interface ISftpService
+{
+    /// <summary>
+    /// Downloads a file from the SFTP server.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="localPath">The local destination path.</param>
+    /// <param name="progress">Progress callback (0-100).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task DownloadFileAsync(string remotePath, string localPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads file content as a string.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The file content as string.</returns>
+    Task<string> DownloadTextAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads text content to the SFTP server.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="content">The text content to upload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task UploadTextAsync(string remotePath, string content, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists files in a remote directory.
+    /// </summary>
+    /// <param name="remotePath">The remote directory path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of file names.</returns>
+    Task<IReadOnlyList<string>> ListFilesAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists all files recursively in a remote directory with metadata.
+    /// </summary>
+    /// <param name="remotePath">The remote directory path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of remote file info with paths relative to remotePath.</returns>
+    Task<IReadOnlyList<RemoteFileInfo>> ListFilesRecursiveAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes SHA-256 hash of a remote file.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The SHA-256 hash as lowercase hex string.</returns>
+    Task<string> ComputeRemoteHashAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a remote file exists.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if file exists.</returns>
+    Task<bool> FileExistsAsync(string remotePath, CancellationToken cancellationToken = default);
+}

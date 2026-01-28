@@ -1,0 +1,25 @@
+using System.Windows;
+using System.Windows.Controls;
+using Image = System.Windows.Controls.Image;
+
+namespace Kaadu.Views;
+
+/// <summary>
+/// Interaction logic for LauncherView.xaml
+/// </summary>
+public partial class LauncherView : UserControl
+{
+    public LauncherView()
+    {
+        InitializeComponent();
+    }
+
+    private void GameLogoImage_ImageFailed(object sender, ExceptionRoutedEventArgs e)
+    {
+        if (sender is Image img)
+        {
+            img.Visibility = Visibility.Collapsed;
+        }
+    }
+}
+

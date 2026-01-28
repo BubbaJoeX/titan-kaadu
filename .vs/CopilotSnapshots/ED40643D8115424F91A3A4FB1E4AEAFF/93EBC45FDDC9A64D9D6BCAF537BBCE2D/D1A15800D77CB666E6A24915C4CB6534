@@ -1,0 +1,15 @@
+﻿using System.Text.Json.Serialization;
+
+namespace Kaadu.Models;
+
+/// <summary>
+/// Represents the remote update manifest containing version and file information.
+/// </summary>
+public sealed class UpdateManifest
+{
+    [JsonPropertyName("latest_version")]
+    public string LatestVersion { get; init; } = string.Empty;
+
+    [JsonPropertyName("files")]
+    public List<FileEntry> Files { get; init; } = [];
+}

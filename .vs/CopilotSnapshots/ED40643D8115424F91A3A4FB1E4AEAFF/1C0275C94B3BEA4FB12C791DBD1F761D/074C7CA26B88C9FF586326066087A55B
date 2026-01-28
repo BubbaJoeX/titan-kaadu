@@ -1,0 +1,98 @@
+﻿using System.Diagnostics;
+using System.Net.Http;
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Implementation of admin service for checking user permission levels.
+/// </summary>
+public sealed class AdminService : IAdminService, IDisposable
+{
+    private readonly HttpClient _httpClient;
+    private bool _disposed;
+
+    public AdminService()
+    {
+        _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(15)
+        };
+    }
+
+    public async Task<int> GetAdminLevelAsync(string username, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(username);
+
+        try
+        {
+            var content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["user_name"] = username
+            });
+
+            Debug.WriteLine($"[AdminService] Checking admin level for: {username}");
+            Debug.WriteLine($"[AdminService] URL: {AppConfiguration.AdminCheckerUrl}");
+
+            var response = await _httpClient.PostAsync(AppConfiguration.AdminCheckerUrl, content, cancellationToken).ConfigureAwait(false);
+
+            Debug.WriteLine($"[AdminService] Response status: {response.StatusCode}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Debug.WriteLine($"[AdminService] Non-success status code, returning 0");
+                return 0;
+            }
+
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            Debug.WriteLine($"[AdminService] Response content: '{responseContent}'");
+
+            // Try to parse admin level from response - direct number
+            var trimmed = responseContent.Trim();
+            if (int.TryParse(trimmed, out var level))
+            {
+                Debug.WriteLine($"[AdminService] Parsed admin level directly: {level}");
+                return level;
+            }
+
+            // Try to extract from JSON if structured response {"admin_level": X}
+            if (responseContent.Contains("admin_level", StringComparison.OrdinalIgnoreCase))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(responseContent, @"""?admin_level""?\s*[=:]\s*(\d+)");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var jsonLevel))
+                {
+                    Debug.WriteLine($"[AdminService] Parsed admin level from JSON: {jsonLevel}");
+                    return jsonLevel;
+                }
+            }
+
+            // Try "level" field
+            if (responseContent.Contains("level", StringComparison.OrdinalIgnoreCase))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(responseContent, @"""?level""?\s*[=:]\s*(\d+)");
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var levelVal))
+                {
+                    Debug.WriteLine($"[AdminService] Parsed level from JSON: {levelVal}");
+                    return levelVal;
+                }
+            }
+
+            Debug.WriteLine($"[AdminService] Could not parse response, returning 0");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[AdminService] Exception: {ex.Message}");
+            return 0;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _httpClient.Dispose();
+            _disposed = true;
+        }
+    }
+}

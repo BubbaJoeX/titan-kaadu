@@ -1,0 +1,61 @@
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Interface for managing user settings persistence.
+/// </summary>
+public interface ISettingsService
+{
+    /// <summary>
+    /// Gets the current user settings.
+    /// </summary>
+    UserSettings Settings { get; }
+
+    /// <summary>
+    /// Gets the effective install path from settings.
+    /// </summary>
+    string InstallPath { get; }
+
+    /// <summary>
+    /// Gets or sets whether the background audio is muted.
+    /// </summary>
+    bool IsMuted { get; set; }
+
+    /// <summary>
+    /// Loads settings from disk.
+    /// </summary>
+    Task LoadAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves current settings to disk.
+    /// </summary>
+    Task SaveAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sets the install path and saves settings.
+    /// </summary>
+    /// <param name="path">The new install path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SetInstallPathAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets whether a custom install path has been configured.
+    /// </summary>
+    bool HasConfiguredInstallPath { get; }
+
+    /// <summary>
+    /// Gets whether the SwgClientSetup_r.exe has been run.
+    /// </summary>
+    bool HasRunSetup { get; }
+
+    /// <summary>
+    /// Marks that the setup executable has been run and saves settings.
+    /// </summary>
+    Task MarkSetupCompleteAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Toggles the mute setting and saves.
+    /// </summary>
+    Task ToggleMuteAsync(CancellationToken cancellationToken = default);
+}

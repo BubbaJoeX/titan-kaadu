@@ -1,0 +1,290 @@
+﻿using System.Collections.ObjectModel;
+using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+
+namespace Kaadu.ViewModels;
+
+/// <summary>
+/// ViewModel for the admin control panel.
+/// </summary>
+public sealed partial class AdminViewModel : ViewModelBase
+{
+    private readonly IUpdateService _updateService;
+    private readonly INavigationService _navigationService;
+    private readonly UserSession _userSession;
+    private CancellationTokenSource? _operationCts;
+
+    [ObservableProperty]
+    private string _statusMessage = "Admin Panel Ready";
+
+    [ObservableProperty]
+    private double _progress;
+
+    [ObservableProperty]
+    private bool _isOperationRunning;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _logEntries = [];
+
+    [ObservableProperty]
+    private string _manifestVersion = "1.0.0";
+
+    public AdminViewModel(
+        IUpdateService updateService,
+        INavigationService navigationService,
+        UserSession userSession)
+    {
+        _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+        _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _userSession = userSession ?? throw new ArgumentNullException(nameof(userSession));
+
+        // Subscribe to events
+        _updateService.StatusChanged += OnStatusChanged;
+        _updateService.ProgressChanged += OnProgressChanged;
+        _updateService.StatusMessageChanged += OnStatusMessageChanged;
+
+        AddLog($"Admin session started for {userSession.Username} (Level {userSession.AdminLevel})");
+    }
+
+    public string Username => _userSession.Username;
+    public int AdminLevel => _userSession.AdminLevel;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteOperation))]
+    private async Task ForceUpdateAsync(CancellationToken cancellationToken)
+    {
+        AddLog("Starting force update...");
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsOperationRunning = true;
+
+        try
+        {
+            var success = await _updateService.CheckAndUpdateAsync(_operationCts.Token).ConfigureAwait(true);
+            AddLog(success ? "Force update completed successfully." : "Force update failed.");
+        }
+        catch (OperationCanceledException)
+        {
+            AddLog("Force update cancelled.");
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Force update error: {ex.Message}");
+        }
+        finally
+        {
+            IsOperationRunning = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            NotifyCommandsCanExecuteChanged();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteOperation))]
+    private async Task RepairGameAsync(CancellationToken cancellationToken)
+    {
+        AddLog("Starting game repair...");
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsOperationRunning = true;
+
+        try
+        {
+            var success = await _updateService.RepairGameAsync(_operationCts.Token).ConfigureAwait(true);
+            AddLog(success ? "Game repair completed successfully." : "Game repair failed.");
+        }
+        catch (OperationCanceledException)
+        {
+            AddLog("Game repair cancelled.");
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Game repair error: {ex.Message}");
+        }
+        finally
+        {
+            IsOperationRunning = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            NotifyCommandsCanExecuteChanged();
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteOperation))]
+    private async Task ReinstallBaseAsync(CancellationToken cancellationToken)
+    {
+        AddLog("Starting base game reinstallation...");
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsOperationRunning = true;
+
+        try
+        {
+            // Remove base installed marker to force reinstall
+            if (File.Exists(AppConfiguration.BaseInstalledMarkerPath))
+            {
+                File.Delete(AppConfiguration.BaseInstalledMarkerPath);
+                AddLog("Removed base installation marker.");
+            }
+
+            var success = await _updateService.InstallBaseGameAsync(_operationCts.Token).ConfigureAwait(true);
+            AddLog(success ? "Base game reinstallation completed successfully." : "Base game reinstallation failed.");
+        }
+        catch (OperationCanceledException)
+        {
+            AddLog("Base game reinstallation cancelled.");
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Base game reinstallation error: {ex.Message}");
+        }
+        finally
+        {
+            IsOperationRunning = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            NotifyCommandsCanExecuteChanged();
+        }
+    }
+
+    private bool CanExecuteOperation() => !IsOperationRunning && !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteOperation))]
+    private async Task GenerateManifestAsync(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(ManifestVersion))
+        {
+            AddLog("Error: Version cannot be empty.");
+            return;
+        }
+
+        AddLog($"Starting manifest generation for version {ManifestVersion}...");
+        _operationCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsOperationRunning = true;
+
+        try
+        {
+            var progressReporter = new Progress<string>(message => AddLog(message));
+            await _updateService.GenerateAndUploadManifestAsync(ManifestVersion, progressReporter, _operationCts.Token).ConfigureAwait(true);
+            AddLog("Manifest generation and upload completed successfully!");
+        }
+        catch (OperationCanceledException)
+        {
+            AddLog("Manifest generation cancelled.");
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Manifest generation error: {ex.Message}");
+        }
+        finally
+        {
+            IsOperationRunning = false;
+            _operationCts?.Dispose();
+            _operationCts = null;
+            NotifyCommandsCanExecuteChanged();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelOperation()
+    {
+        _operationCts?.Cancel();
+        AddLog("Operation cancellation requested.");
+    }
+
+    [RelayCommand]
+    private void ClearLogs()
+    {
+        LogEntries.Clear();
+        AddLog("Logs cleared.");
+    }
+
+    [RelayCommand]
+    private void BackToLauncher()
+    {
+        _operationCts?.Cancel();
+        _navigationService.NavigateToLauncher();
+    }
+
+    [RelayCommand]
+    private async Task OpenInstallFolderAsync()
+    {
+        try
+        {
+            if (Directory.Exists(AppConfiguration.InstallPath))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = AppConfiguration.InstallPath,
+                    UseShellExecute = true
+                });
+                AddLog($"Opened install folder: {AppConfiguration.InstallPath}");
+            }
+            else
+            {
+                AddLog($"Install folder does not exist: {AppConfiguration.InstallPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            AddLog($"Failed to open install folder: {ex.Message}");
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void AddLog(string message)
+    {
+        var timestamp = DateTime.Now.ToString("HH:mm:ss");
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            LogEntries.Insert(0, $"[{timestamp}] {message}");
+            
+            // Keep log entries under 500
+            while (LogEntries.Count > 500)
+            {
+                LogEntries.RemoveAt(LogEntries.Count - 1);
+            }
+        });
+    }
+
+    private void OnStatusChanged(object? sender, UpdateStatus status)
+    {
+        AddLog($"Status: {status}");
+    }
+
+    private void OnProgressChanged(object? sender, double progress)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            Progress = progress;
+        });
+    }
+
+    private void OnStatusMessageChanged(object? sender, string message)
+    {
+        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+        {
+            StatusMessage = message;
+        });
+    }
+
+    private void NotifyCommandsCanExecuteChanged()
+    {
+        ForceUpdateCommand.NotifyCanExecuteChanged();
+        RepairGameCommand.NotifyCanExecuteChanged();
+        ReinstallBaseCommand.NotifyCanExecuteChanged();
+        GenerateManifestCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Cleanup when navigating away.
+    /// </summary>
+    public void Cleanup()
+    {
+        _updateService.StatusChanged -= OnStatusChanged;
+        _updateService.ProgressChanged -= OnProgressChanged;
+        _updateService.StatusMessageChanged -= OnStatusMessageChanged;
+        _operationCts?.Cancel();
+        _operationCts?.Dispose();
+    }
+}

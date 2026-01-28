@@ -1,0 +1,16 @@
+﻿namespace Kaadu.Models;
+
+/// <summary>
+/// Represents a character from the character list file.
+/// </summary>
+public sealed record CharacterInfo(
+    string Server,
+    string CharacterName,
+    string Field3,
+    string Field4)
+{
+    /// <summary>
+    /// Gets the display name for the character.
+    /// </summary>
+    public string DisplayName => CharacterName;
+}

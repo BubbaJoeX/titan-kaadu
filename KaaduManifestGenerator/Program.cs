@@ -1,0 +1,393 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace KaaduManifestGenerator;
+
+/// <summary>
+/// Kaadu Patch Manifest Generator
+/// Generates update_manifest.json files for the Kaadu game launcher.
+/// </summary>
+public static class Program
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
+
+    public static async Task<int> Main(string[] args)
+    {
+        Console.WriteLine("╔══════════════════════════════════════════╗");
+        Console.WriteLine("║   Kaadu Patch Manifest Generator v1.0   ║");
+        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine();
+
+        if (args.Length == 0 || args.Contains("--help") || args.Contains("-h"))
+        {
+            PrintUsage();
+            return args.Length == 0 ? 1 : 0;
+        }
+
+        var command = args[0].ToLowerInvariant();
+
+        return command switch
+        {
+            "generate" => await GenerateManifestAsync(args.Skip(1).ToArray()),
+            "verify" => await VerifyManifestAsync(args.Skip(1).ToArray()),
+            "hash" => await HashFileAsync(args.Skip(1).ToArray()),
+            _ => InvalidCommand(command)
+        };
+    }
+
+    private static void PrintUsage()
+    {
+        Console.WriteLine("Usage: kaadu-manifest <command> [options]");
+        Console.WriteLine();
+        Console.WriteLine("Commands:");
+        Console.WriteLine("  generate   Generate a new manifest from a game directory");
+        Console.WriteLine("  verify     Verify files against an existing manifest");
+        Console.WriteLine("  hash       Calculate SHA-256 hash of a single file");
+        Console.WriteLine();
+        Console.WriteLine("Generate Options:");
+        Console.WriteLine("  -d, --directory <path>   Game files directory (required)");
+        Console.WriteLine("  -v, --version <version>  Version string (required)");
+        Console.WriteLine("  -o, --output <path>      Output manifest path (default: update_manifest.json)");
+        Console.WriteLine("  -e, --exclude <pattern>  Exclude pattern (can be used multiple times)");
+        Console.WriteLine();
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  kaadu-manifest generate -d ./game -v 1.2.3 -o manifest.json");
+        Console.WriteLine("  kaadu-manifest generate -d C:\\game -v 1.0.0 -e *.log -e *.tmp");
+        Console.WriteLine("  kaadu-manifest verify -d ./game -m manifest.json");
+        Console.WriteLine("  kaadu-manifest hash ./game/bin/client.exe");
+    }
+
+    private static int InvalidCommand(string command)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine($"Unknown command: {command}");
+        Console.ResetColor();
+        Console.WriteLine();
+        PrintUsage();
+        return 1;
+    }
+
+    private static async Task<int> GenerateManifestAsync(string[] args)
+    {
+        string? directory = null;
+        string? version = null;
+        string output = "update_manifest.json";
+        var excludePatterns = new List<string> { "*.log", "*.tmp", "version.json", ".base_installed", ".mdmp", ".txt" };
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "-d":
+                case "--directory":
+                    directory = args[++i];
+                    break;
+                case "-v":
+                case "--version":
+                    version = args[++i];
+                    break;
+                case "-o":
+                case "--output":
+                    output = args[++i];
+                    break;
+                case "-e":
+                case "--exclude":
+                    excludePatterns.Add(args[++i]);
+                    break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(directory))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Error: --directory is required");
+            Console.ResetColor();
+            return 1;
+        }
+
+        if (string.IsNullOrEmpty(version))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Error: --version is required");
+            Console.ResetColor();
+            return 1;
+        }
+
+        if (!Directory.Exists(directory))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error: Directory not found: {directory}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.WriteLine($"Directory: {Path.GetFullPath(directory)}");
+        Console.WriteLine($"Version:   {version}");
+        Console.WriteLine($"Output:    {output}");
+        Console.WriteLine($"Excluding: {string.Join(", ", excludePatterns)}");
+        Console.WriteLine();
+
+        var files = new List<FileEntry>();
+        var allFiles = Directory.GetFiles(directory, "*", SearchOption.AllDirectories);
+        var processedCount = 0;
+
+        Console.WriteLine($"Scanning {allFiles.Length} files...");
+        Console.WriteLine();
+
+        foreach (var filePath in allFiles)
+        {
+            var relativePath = Path.GetRelativePath(directory, filePath).Replace('\\', '/');
+
+            // Check exclusions
+            var fileName = Path.GetFileName(filePath);
+            if (excludePatterns.Any(p => MatchesPattern(fileName, p) || MatchesPattern(relativePath, p)))
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"  [SKIP] {relativePath}");
+                Console.ResetColor();
+                continue;
+            }
+
+            var hash = await ComputeHashAsync(filePath);
+            var fileInfo = new FileInfo(filePath);
+
+            files.Add(new FileEntry
+            {
+                Path = relativePath,
+                Checksum = hash,
+                Size = fileInfo.Length
+            });
+
+            processedCount++;
+            Console.WriteLine($"  [OK]   {relativePath} ({FormatSize(fileInfo.Length)})");
+        }
+
+        var manifest = new UpdateManifest
+        {
+            LatestVersion = version,
+            Files = files.OrderBy(f => f.Path).ToList(),
+            GeneratedAt = DateTime.UtcNow,
+            TotalSize = files.Sum(f => f.Size)
+        };
+
+        var json = JsonSerializer.Serialize(manifest, JsonOptions);
+        await File.WriteAllTextAsync(output, json);
+
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"✓ Manifest generated successfully!");
+        Console.ResetColor();
+        Console.WriteLine($"  Files:      {files.Count}");
+        Console.WriteLine($"  Total size: {FormatSize(manifest.TotalSize)}");
+        Console.WriteLine($"  Output:     {Path.GetFullPath(output)}");
+
+        return 0;
+    }
+
+    private static async Task<int> VerifyManifestAsync(string[] args)
+    {
+        string? directory = null;
+        string manifestPath = "update_manifest.json";
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "-d":
+                case "--directory":
+                    directory = args[++i];
+                    break;
+                case "-m":
+                case "--manifest":
+                    manifestPath = args[++i];
+                    break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(directory))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Error: --directory is required");
+            Console.ResetColor();
+            return 1;
+        }
+
+        if (!File.Exists(manifestPath))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error: Manifest not found: {manifestPath}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var json = await File.ReadAllTextAsync(manifestPath);
+        var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions);
+
+        if (manifest == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Error: Failed to parse manifest");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.WriteLine($"Verifying {manifest.Files.Count} files against manifest v{manifest.LatestVersion}...");
+        Console.WriteLine();
+
+        var missingCount = 0;
+        var mismatchCount = 0;
+        var validCount = 0;
+
+        foreach (var entry in manifest.Files)
+        {
+            var filePath = Path.Combine(directory, entry.Path.Replace('/', Path.DirectorySeparatorChar));
+
+            if (!File.Exists(filePath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  [MISSING]  {entry.Path}");
+                Console.ResetColor();
+                missingCount++;
+                continue;
+            }
+
+            var hash = await ComputeHashAsync(filePath);
+            if (!string.Equals(hash, entry.Checksum, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"  [MISMATCH] {entry.Path}");
+                Console.WriteLine($"             Expected: {entry.Checksum}");
+                Console.WriteLine($"             Actual:   {hash}");
+                Console.ResetColor();
+                mismatchCount++;
+                continue;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"  [VALID]    {entry.Path}");
+            Console.ResetColor();
+            validCount++;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Results: {validCount} valid, {missingCount} missing, {mismatchCount} mismatched");
+
+        if (missingCount == 0 && mismatchCount == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("✓ All files verified successfully!");
+            Console.ResetColor();
+            return 0;
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("✗ Verification failed!");
+            Console.ResetColor();
+            return 1;
+        }
+    }
+
+    private static async Task<int> HashFileAsync(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Error: File path required");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var filePath = args[0];
+
+        if (!File.Exists(filePath))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Error: File not found: {filePath}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var hash = await ComputeHashAsync(filePath);
+        var fileInfo = new FileInfo(filePath);
+
+        Console.WriteLine($"File: {Path.GetFullPath(filePath)}");
+        Console.WriteLine($"Size: {FormatSize(fileInfo.Length)}");
+        Console.WriteLine();
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"SHA-256: {hash}");
+        Console.ResetColor();
+        Console.WriteLine();
+        Console.WriteLine("Manifest entry:");
+        Console.ForegroundColor = ConsoleColor.Gray;
+        Console.WriteLine($"{{ \"path\": \"{Path.GetFileName(filePath)}\", \"checksum\": \"{hash}\" }}");
+        Console.ResetColor();
+
+        return 0;
+    }
+
+    private static async Task<string> ComputeHashAsync(string filePath)
+    {
+        await using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+        var hashBytes = await SHA256.HashDataAsync(stream);
+        return Convert.ToHexString(hashBytes).ToLowerInvariant();
+    }
+
+    private static bool MatchesPattern(string fileName, string pattern)
+    {
+        if (pattern.StartsWith('*'))
+        {
+            return fileName.EndsWith(pattern[1..], StringComparison.OrdinalIgnoreCase);
+        }
+        if (pattern.EndsWith('*'))
+        {
+            return fileName.StartsWith(pattern[..^1], StringComparison.OrdinalIgnoreCase);
+        }
+        return string.Equals(fileName, pattern, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB"];
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}
+
+public class UpdateManifest
+{
+    [JsonPropertyName("latest_version")]
+    public string LatestVersion { get; set; } = string.Empty;
+
+    [JsonPropertyName("files")]
+    public List<FileEntry> Files { get; set; } = [];
+
+    [JsonPropertyName("generated_at")]
+    public DateTime GeneratedAt { get; set; }
+
+    [JsonPropertyName("total_size")]
+    public long TotalSize { get; set; }
+}
+
+public class FileEntry
+{
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
+
+    [JsonPropertyName("checksum")]
+    public string Checksum { get; set; } = string.Empty;
+
+    [JsonPropertyName("size")]
+    public long Size { get; set; }
+}

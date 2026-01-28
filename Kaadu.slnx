@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Kaadu/Kaadu.csproj" />
+  <Project Path="KaaduManifestGenerator/KaaduManifestGenerator.csproj" />
+</Solution>

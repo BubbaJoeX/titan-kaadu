@@ -1,0 +1,498 @@
+﻿using System.Drawing;
+using System.IO;
+using System.Reflection;
+using System.Windows;
+using System.Windows.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+using Kaadu.ViewModels;
+using Forms = System.Windows.Forms;
+
+namespace Kaadu;
+
+/// <summary>
+/// Main application window with custom chrome and view navigation.
+/// </summary>
+public partial class MainWindow : Window
+{
+    private readonly INavigationService _navigationService;
+    private readonly IAuthService _authService;
+    private readonly IAdminService _adminService;
+    private readonly ISftpService _sftpService;
+    private readonly IHashService _hashService;
+    private readonly IUpdateService _updateService;
+    private readonly ISettingsService _settingsService;
+    private readonly ICharacterService _characterService;
+    private readonly ILauncherUpdateService _launcherUpdateService;
+
+    private Forms.NotifyIcon? _notifyIcon;
+    private UserSession _currentSession = UserSession.Unauthenticated;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        // Initialize services
+        _settingsService = new SettingsService();
+        _adminService = new AdminService();
+        _authService = new AuthService(_adminService);
+        _sftpService = new SftpService();
+        _hashService = new HashService();
+        _updateService = new UpdateService(_sftpService, _hashService);
+        _characterService = new CharacterService();
+        _launcherUpdateService = new LauncherUpdateService(_sftpService);
+
+        // Initialize navigation service with view model factories
+        _navigationService = new NavigationService(
+            CreateLoginViewModel,
+            CreateLauncherViewModel,
+            CreateAdminViewModel,
+            CreateInstallPathViewModel);
+
+        // Subscribe to navigation events
+        _navigationService.Navigated += OnNavigated;
+
+        // Subscribe to state change for minimize to tray
+        StateChanged += OnStateChanged;
+
+        // Set initial data context
+        DataContext = this;
+
+        // Initialize system tray icon (after other initialization)
+        InitializeNotifyIcon();
+
+        // Load settings and navigate to login on startup
+        _ = InitializeAsync();
+
+        // Start video when window is loaded (audio starts after login)
+        Loaded += OnWindowLoaded;
+        Closing += OnWindowClosing;
+    }
+
+    private void OnWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        // Start background video only (audio starts after login)
+        BackgroundVideo.Play();
+        UpdateMuteIcon();
+    }
+
+    private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        // Stop media
+        BackgroundVideo.Stop();
+        BackgroundAudio.Stop();
+    }
+
+    /// <summary>
+    /// Starts background audio after successful login.
+    /// </summary>
+    public void StartBackgroundAudio()
+    {
+        if (!_settingsService.IsMuted)
+        {
+            BackgroundAudio.Play();
+        }
+    }
+
+    private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
+    {
+        // Loop the video
+        BackgroundVideo.Position = TimeSpan.Zero;
+        BackgroundVideo.Play();
+    }
+
+    private void BackgroundAudio_MediaEnded(object sender, RoutedEventArgs e)
+    {
+        // Loop the audio
+        BackgroundAudio.Position = TimeSpan.Zero;
+        if (!_settingsService.IsMuted)
+        {
+            BackgroundAudio.Play();
+        }
+    }
+
+    private void MuteButton_Click(object sender, RoutedEventArgs e)
+    {
+        _ = ToggleMuteAsync();
+    }
+
+    private async Task ToggleMuteAsync()
+    {
+        await _settingsService.ToggleMuteAsync();
+        
+        if (_settingsService.IsMuted)
+        {
+            BackgroundAudio.Pause();
+        }
+        else
+        {
+            BackgroundAudio.Play();
+        }
+        
+        UpdateMuteIcon();
+    }
+
+    private void UpdateMuteIcon()
+    {
+        MuteIcon.Text = _settingsService.IsMuted ? "🔇" : "🔊";
+    }
+
+    private void InitializeNotifyIcon()
+    {
+        _notifyIcon = new Forms.NotifyIcon
+        {
+            Text = "Titan Launcher",
+            Visible = true
+        };
+
+        // Load icon - try multiple sources
+        try
+        {
+            // First try: Load from Assets folder in output directory
+            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "TITAN_LOGO.ico");
+            if (File.Exists(iconPath))
+            {
+                _notifyIcon.Icon = new Icon(iconPath);
+            }
+            else
+            {
+                // Second try: Load directly from base directory
+                iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TITAN_LOGO.ico");
+                if (File.Exists(iconPath))
+                {
+                    _notifyIcon.Icon = new Icon(iconPath);
+                }
+                else
+                {
+                    // Third try: Extract from the application's embedded icon
+                    var appIcon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? Assembly.GetExecutingAssembly().Location);
+                    _notifyIcon.Icon = appIcon ?? SystemIcons.Application;
+                }
+            }
+        }
+        catch
+        {
+            _notifyIcon.Icon = SystemIcons.Application;
+        }
+
+        // Double-click to restore window
+        _notifyIcon.DoubleClick += (s, e) => RestoreFromTray();
+
+        // Create initial context menu
+        UpdateNotifyIconContextMenu();
+    }
+
+
+    private void UpdateNotifyIconContextMenu()
+    {
+        if (_notifyIcon == null) return;
+
+        var contextMenu = new Forms.ContextMenuStrip();
+
+        // Play option
+        var playItem = new Forms.ToolStripMenuItem("Play");
+        playItem.Click += async (s, e) => await PlayFromTrayAsync();
+        playItem.Enabled = _currentSession.IsAuthenticated && _updateService.IsBaseGameInstalled;
+        contextMenu.Items.Add(playItem);
+
+        // Check for Updates
+        var updateItem = new Forms.ToolStripMenuItem("Check for Updates");
+        updateItem.Click += async (s, e) => await CheckUpdatesFromTrayAsync();
+        updateItem.Enabled = _currentSession.IsAuthenticated;
+        contextMenu.Items.Add(updateItem);
+
+        // Character submenu (if characters exist)
+        if (_currentSession.IsAuthenticated && _characterService.HasCharacterList(_currentSession.Username))
+        {
+            contextMenu.Items.Add(new Forms.ToolStripSeparator());
+            
+            var charactersMenu = new Forms.ToolStripMenuItem(_currentSession.Username);
+            
+            var characters = _characterService.GetCharactersAsync(_currentSession.Username).GetAwaiter().GetResult();
+            foreach (var character in characters)
+            {
+                var charItem = new Forms.ToolStripMenuItem(character.CharacterName);
+                charItem.Click += async (s, e) => await PlayAsCharacterFromTrayAsync(character);
+                charactersMenu.DropDownItems.Add(charItem);
+            }
+
+            if (characters.Count > 0)
+            {
+                contextMenu.Items.Add(charactersMenu);
+            }
+        }
+
+        contextMenu.Items.Add(new Forms.ToolStripSeparator());
+
+        // Show window
+        var showItem = new Forms.ToolStripMenuItem("Show Launcher");
+        showItem.Click += (s, e) => RestoreFromTray();
+        showItem.Font = new Font(showItem.Font, System.Drawing.FontStyle.Bold);
+        contextMenu.Items.Add(showItem);
+
+        // Exit
+        var exitItem = new Forms.ToolStripMenuItem("Exit");
+        exitItem.Click += (s, e) => ExitApplication();
+        contextMenu.Items.Add(exitItem);
+
+        _notifyIcon.ContextMenuStrip = contextMenu;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (WindowState == WindowState.Minimized && _notifyIcon != null)
+        {
+            // Hide from taskbar and show in system tray
+            Hide();
+            _notifyIcon.Visible = true;
+        }
+    }
+
+    private void RestoreFromTray()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private async Task PlayFromTrayAsync()
+    {
+        try
+        {
+            await _updateService.LaunchGameAsync();
+            
+            // Ensure launcher is minimized to tray so game has full viewport
+            WindowState = WindowState.Minimized;
+        }
+        catch (Exception ex)
+        {
+            RestoreFromTray();
+            Forms.MessageBox.Show($"Failed to launch game: {ex.Message}", "Error", 
+                Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task PlayAsCharacterFromTrayAsync(CharacterInfo character)
+    {
+        try
+        {
+            await _updateService.LaunchGameWithAutoLoginAsync(
+                _currentSession.Username,
+                _currentSession.Password ?? string.Empty,
+                _currentSession.ServerAddress ?? string.Empty,
+                character.BaseName);
+            
+            // Ensure launcher is minimized to tray so game has full viewport
+            WindowState = WindowState.Minimized;
+        }
+        catch (Exception ex)
+        {
+            RestoreFromTray();
+            Forms.MessageBox.Show($"Failed to launch game: {ex.Message}", "Error",
+                Forms.MessageBoxButtons.OK, Forms.MessageBoxIcon.Error);
+        }
+    }
+
+    private async Task CheckUpdatesFromTrayAsync()
+    {
+        RestoreFromTray();
+        
+        // Navigate to launcher and trigger update check
+        if (_navigationService.CurrentViewModel is LauncherViewModel launcherVm)
+        {
+            if (launcherVm.CheckForUpdatesCommand.CanExecute(null))
+            {
+                await launcherVm.CheckForUpdatesCommand.ExecuteAsync(null);
+            }
+        }
+    }
+
+    private void ExitApplication()
+    {
+        if (_notifyIcon != null)
+        {
+            _notifyIcon.Visible = false;
+            _notifyIcon.Dispose();
+        }
+        
+        // Cleanup services
+        if (_authService is IDisposable authDisposable)
+            authDisposable.Dispose();
+
+        if (_adminService is IDisposable adminDisposable)
+            adminDisposable.Dispose();
+
+        if (_sftpService is IDisposable sftpDisposable)
+            sftpDisposable.Dispose();
+
+        Application.Current.Shutdown();
+    }
+
+    private async Task InitializeAsync()
+    {
+        await _settingsService.LoadAsync();
+        
+        // Apply loaded install path to configuration
+        AppConfiguration.InstallPath = _settingsService.InstallPath;
+
+        // Check for launcher updates before proceeding
+        await CheckLauncherUpdateAsync();
+        
+        _navigationService.NavigateToLogin();
+    }
+
+    private async Task CheckLauncherUpdateAsync()
+    {
+        try
+        {
+            var updateInfo = await _launcherUpdateService.CheckForUpdateAsync();
+            
+            if (updateInfo != null)
+            {
+                var result = Forms.MessageBox.Show(
+                    $"A new launcher version is available: v{updateInfo.Version}\n\n" +
+                    $"Current version: v{_launcherUpdateService.LocalVersion}\n\n" +
+                    (string.IsNullOrEmpty(updateInfo.ReleaseNotes) ? "" : $"Release notes:\n{updateInfo.ReleaseNotes}\n\n") +
+                    "Would you like to update now?",
+                    "Launcher Update Available",
+                    Forms.MessageBoxButtons.YesNo,
+                    Forms.MessageBoxIcon.Information);
+
+                if (result == Forms.DialogResult.Yes)
+                {
+                    var success = await _launcherUpdateService.DownloadAndApplyUpdateAsync(updateInfo);
+                    
+                    if (success)
+                    {
+                        // Exit to allow the update script to replace the executable
+                        Application.Current.Shutdown();
+                        return;
+                    }
+                    else
+                    {
+                        Forms.MessageBox.Show(
+                            "Failed to download the update. The launcher will continue with the current version.",
+                            "Update Failed",
+                            Forms.MessageBoxButtons.OK,
+                            Forms.MessageBoxIcon.Warning);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Launcher update check failed: {ex.Message}");
+            // Continue with current version if update check fails
+        }
+    }
+
+    /// <summary>
+    /// Gets the current view model for binding.
+    /// </summary>
+    public ViewModelBase? CurrentViewModel => _navigationService.CurrentViewModel;
+
+    private LoginViewModel CreateLoginViewModel()
+    {
+        return new LoginViewModel(_authService, OnLoginSuccess);
+    }
+
+    private LauncherViewModel CreateLauncherViewModel()
+    {
+        return new LauncherViewModel(_updateService, _navigationService, _settingsService, _characterService, _currentSession);
+    }
+
+    private AdminViewModel CreateAdminViewModel()
+    {
+        return new AdminViewModel(_updateService, _navigationService, _currentSession);
+    }
+
+    private InstallPathViewModel CreateInstallPathViewModel()
+    {
+        return new InstallPathViewModel(_settingsService, _navigationService, OnInstallPathConfigured);
+    }
+
+    private void OnLoginSuccess(UserSession session)
+    {
+        _currentSession = session;
+
+        // Update tray menu with new session info
+        UpdateNotifyIconContextMenu();
+
+        // Start background audio after successful login
+        StartBackgroundAudio();
+
+        // After login, check if install path is configured
+        // If not, navigate to install path selection; otherwise proceed to launcher
+        if (!_settingsService.HasConfiguredInstallPath)
+        {
+            Dispatcher.InvokeAsync(() => _navigationService.NavigateToInstallPath());
+        }
+        else
+        {
+            Dispatcher.InvokeAsync(() => _navigationService.NavigateToLauncher());
+        }
+    }
+
+    private void OnInstallPathConfigured()
+    {
+        // Install path has been configured, launcher navigation is handled by the ViewModel
+    }
+
+    private void OnNavigated(object? sender, ViewModelBase viewModel)
+    {
+        // Notify binding system of view model change
+        OnPropertyChanged(nameof(CurrentViewModel));
+    }
+
+    private void OnPropertyChanged(string propertyName)
+    {
+        // Manual property changed notification for simple case
+        Dispatcher.Invoke(() =>
+        {
+            var binding = GetBindingExpression(DataContextProperty);
+            binding?.UpdateTarget();
+
+            // Force content update
+            DataContext = null;
+            DataContext = this;
+        });
+    }
+
+    #region Window Chrome Handlers
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximize();
+        }
+        else
+        {
+            DragMove();
+        }
+    }
+
+    private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        ToggleMaximize();
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        ExitApplication();
+    }
+
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+    }
+
+    #endregion
+}

@@ -1,0 +1,40 @@
+﻿namespace Kaadu.Services;
+
+/// <summary>
+/// Service for SFTP file operations.
+/// </summary>
+public interface ISftpService
+{
+    /// <summary>
+    /// Downloads a file from the SFTP server.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="localPath">The local destination path.</param>
+    /// <param name="progress">Progress callback (0-100).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task DownloadFileAsync(string remotePath, string localPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Downloads file content as a string.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The file content as string.</returns>
+    Task<string> DownloadTextAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists files in a remote directory.
+    /// </summary>
+    /// <param name="remotePath">The remote directory path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of file names.</returns>
+    Task<IReadOnlyList<string>> ListFilesAsync(string remotePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks if a remote file exists.
+    /// </summary>
+    /// <param name="remotePath">The remote file path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>True if file exists.</returns>
+    Task<bool> FileExistsAsync(string remotePath, CancellationToken cancellationToken = default);
+}

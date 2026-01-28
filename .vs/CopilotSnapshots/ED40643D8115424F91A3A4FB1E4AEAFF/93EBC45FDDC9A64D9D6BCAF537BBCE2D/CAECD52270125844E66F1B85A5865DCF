@@ -1,0 +1,200 @@
+﻿using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Kaadu.Models;
+using Kaadu.Services;
+
+namespace Kaadu.ViewModels;
+
+/// <summary>
+/// ViewModel for the main launcher screen.
+/// </summary>
+public sealed partial class LauncherViewModel : ViewModelBase
+{
+    private readonly IUpdateService _updateService;
+    private readonly INavigationService _navigationService;
+    private readonly UserSession _userSession;
+    private CancellationTokenSource? _updateCts;
+
+    [ObservableProperty]
+    private string _currentVersion = "Unknown";
+
+    [ObservableProperty]
+    private string _latestVersion = "Unknown";
+
+    [ObservableProperty]
+    private UpdateStatus _status = UpdateStatus.Idle;
+
+    [ObservableProperty]
+    private string _statusMessage = "Initializing...";
+
+    [ObservableProperty]
+    private double _progress;
+
+    [ObservableProperty]
+    private bool _canPlay;
+
+    [ObservableProperty]
+    private bool _isUpdating;
+
+    [ObservableProperty]
+    private bool _showAdminButton;
+
+    public LauncherViewModel(
+        IUpdateService updateService,
+        INavigationService navigationService,
+        UserSession userSession)
+    {
+        _updateService = updateService ?? throw new ArgumentNullException(nameof(updateService));
+        _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
+        _userSession = userSession ?? throw new ArgumentNullException(nameof(userSession));
+
+        ShowAdminButton = userSession.IsAdmin;
+
+        // Subscribe to update service events
+        _updateService.StatusChanged += OnStatusChanged;
+        _updateService.ProgressChanged += OnProgressChanged;
+        _updateService.StatusMessageChanged += OnStatusMessageChanged;
+    }
+
+    public string Username => _userSession.Username;
+    public int AdminLevel => _userSession.AdminLevel;
+
+    [RelayCommand]
+    private async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        await CheckForUpdatesAsync(cancellationToken);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecutePlay))]
+    private async Task PlayAsync()
+    {
+        try
+        {
+            IsBusy = true;
+            await _updateService.LaunchGameAsync().ConfigureAwait(true);
+
+            // Optionally close launcher after launching game
+            // Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            SetError($"Failed to launch game: {ex.Message}");
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private bool CanExecutePlay() => CanPlay && !IsBusy && !IsUpdating;
+
+    [RelayCommand(CanExecute = nameof(CanExecuteCheckUpdate))]
+    private async Task CheckForUpdatesAsync(CancellationToken cancellationToken)
+    {
+        if (IsUpdating)
+            return;
+
+        _updateCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        IsUpdating = true;
+        CanPlay = false;
+        ClearError();
+
+        try
+        {
+            // Get current local version
+            CurrentVersion = await _updateService.GetLocalVersionAsync(_updateCts.Token).ConfigureAwait(true);
+
+            // Get remote manifest
+            var manifest = await _updateService.GetRemoteManifestAsync(_updateCts.Token).ConfigureAwait(true);
+            LatestVersion = manifest?.LatestVersion ?? "Unknown";
+
+            // Perform update check
+            var success = await _updateService.CheckAndUpdateAsync(_updateCts.Token).ConfigureAwait(true);
+
+            if (success)
+            {
+                CanPlay = true;
+                CurrentVersion = LatestVersion;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Update cancelled.";
+        }
+        catch (Exception ex)
+        {
+            SetError($"Update error: {ex.Message}");
+        }
+        finally
+        {
+            IsUpdating = false;
+            _updateCts?.Dispose();
+            _updateCts = null;
+            PlayCommand.NotifyCanExecuteChanged();
+            CheckForUpdatesCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private bool CanExecuteCheckUpdate() => !IsUpdating && !IsBusy;
+
+    [RelayCommand]
+    private void CancelUpdate()
+    {
+        _updateCts?.Cancel();
+    }
+
+    [RelayCommand]
+    private void OpenAdmin()
+    {
+        if (_userSession.IsAdmin)
+        {
+            _navigationService.NavigateToAdmin();
+        }
+    }
+
+    [RelayCommand]
+    private void Logout()
+    {
+        _updateCts?.Cancel();
+        _navigationService.NavigateToLogin();
+    }
+
+    private void OnStatusChanged(object? sender, UpdateStatus status)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Status = status;
+            CanPlay = status == UpdateStatus.Ready;
+            PlayCommand.NotifyCanExecuteChanged();
+        });
+    }
+
+    private void OnProgressChanged(object? sender, double progress)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Progress = progress;
+        });
+    }
+
+    private void OnStatusMessageChanged(object? sender, string message)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            StatusMessage = message;
+        });
+    }
+
+    /// <summary>
+    /// Cleanup when navigating away.
+    /// </summary>
+    public void Cleanup()
+    {
+        _updateService.StatusChanged -= OnStatusChanged;
+        _updateService.ProgressChanged -= OnProgressChanged;
+        _updateService.StatusMessageChanged -= OnStatusMessageChanged;
+        _updateCts?.Cancel();
+        _updateCts?.Dispose();
+    }
+}

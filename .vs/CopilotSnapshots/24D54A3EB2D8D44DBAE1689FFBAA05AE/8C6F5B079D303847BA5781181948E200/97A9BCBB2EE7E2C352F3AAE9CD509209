@@ -1,0 +1,252 @@
+﻿using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Service for checking and applying launcher self-updates.
+/// </summary>
+public sealed class LauncherUpdateService : ILauncherUpdateService
+{
+    private readonly ISftpService _sftpService;
+
+    public LauncherUpdateService(ISftpService sftpService)
+    {
+        _sftpService = sftpService ?? throw new ArgumentNullException(nameof(sftpService));
+    }
+
+    public string LocalVersion => AppConfiguration.LauncherVersion;
+
+    public event EventHandler<double>? ProgressChanged;
+    public event EventHandler<string>? StatusChanged;
+
+    public async Task<LauncherVersionInfo?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            SetStatus("Checking for launcher updates...");
+            Debug.WriteLine($"[LauncherUpdate] Checking for updates at: {AppConfiguration.LauncherVersionPath}");
+            Debug.WriteLine($"[LauncherUpdate] Current version: {LocalVersion}");
+
+            var json = await _sftpService.DownloadTextAsync(AppConfiguration.LauncherVersionPath, cancellationToken).ConfigureAwait(false);
+            Debug.WriteLine($"[LauncherUpdate] Downloaded JSON: {json}");
+            
+            var remoteVersion = JsonSerializer.Deserialize<LauncherVersionInfo>(json);
+
+            if (remoteVersion == null || string.IsNullOrEmpty(remoteVersion.Version))
+            {
+                Debug.WriteLine("[LauncherUpdate] No valid version info in JSON");
+                SetStatus("No launcher version info available.");
+                return null;
+            }
+
+            Debug.WriteLine($"[LauncherUpdate] Remote version: {remoteVersion.Version}");
+
+            // Compare versions
+            if (IsNewerVersion(remoteVersion.Version, LocalVersion))
+            {
+                Debug.WriteLine($"[LauncherUpdate] Update available: {remoteVersion.Version} > {LocalVersion}");
+                SetStatus($"Launcher update available: v{remoteVersion.Version}");
+                return remoteVersion;
+            }
+
+            // Check minimum version requirement
+            if (!string.IsNullOrEmpty(remoteVersion.MinimumVersion) && 
+                IsNewerVersion(remoteVersion.MinimumVersion, LocalVersion))
+            {
+                Debug.WriteLine($"[LauncherUpdate] Required update (minimum version): {remoteVersion.MinimumVersion}");
+                SetStatus($"Required launcher update: v{remoteVersion.Version}");
+                return remoteVersion;
+            }
+
+            Debug.WriteLine("[LauncherUpdate] Launcher is up to date");
+            SetStatus("Launcher is up to date.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[LauncherUpdate] Failed to check launcher update: {ex.GetType().Name}: {ex.Message}");
+            Debug.WriteLine($"[LauncherUpdate] Stack trace: {ex.StackTrace}");
+            SetStatus("Could not check for launcher updates.");
+            return null;
+        }
+    }
+
+    public async Task<bool> DownloadAndApplyUpdateAsync(LauncherVersionInfo versionInfo, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(versionInfo);
+
+        try
+        {
+            SetStatus($"Downloading launcher v{versionInfo.Version}...");
+            SetProgress(0);
+
+            // Build remote path: /upload/launcher/v1.0.2/
+            var remoteFolder = $"{AppConfiguration.LauncherBinariesPath}v{versionInfo.Version}";
+            
+            // Create temp directory for this update
+            var tempDir = Path.Combine(Path.GetTempPath(), $"Kaadu_Update_v{versionInfo.Version}");
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+            Directory.CreateDirectory(tempDir);
+
+            // List all files in the remote version folder
+            SetStatus("Getting file list...");
+            var remoteFiles = await _sftpService.ListFilesRecursiveAsync(remoteFolder, cancellationToken).ConfigureAwait(false);
+            
+            if (remoteFiles.Count == 0)
+            {
+                SetStatus("No files found in update folder.");
+                return false;
+            }
+
+            // Download all files
+            var totalFiles = remoteFiles.Count;
+            var downloadedFiles = 0;
+            var totalBytes = remoteFiles.Sum(f => f.Size);
+            long downloadedBytes = 0;
+
+            foreach (var file in remoteFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var localFilePath = Path.Combine(tempDir, file.Name);
+                var localFileDir = Path.GetDirectoryName(localFilePath);
+                
+                if (!string.IsNullOrEmpty(localFileDir) && !Directory.Exists(localFileDir))
+                {
+                    Directory.CreateDirectory(localFileDir);
+                }
+
+                SetStatus($"Downloading {file.Name}...");
+                
+                var fileProgress = new Progress<double>(p =>
+                {
+                    var currentFileBytes = (long)(file.Size * p / 100.0);
+                    var totalProgress = totalBytes > 0 
+                        ? (downloadedBytes + currentFileBytes) * 80.0 / totalBytes 
+                        : (downloadedFiles * 80.0 / totalFiles);
+                    SetProgress(totalProgress);
+                });
+
+                await _sftpService.DownloadFileAsync(file.Path, localFilePath, fileProgress, cancellationToken).ConfigureAwait(false);
+                
+                downloadedBytes += file.Size;
+                downloadedFiles++;
+            }
+
+            SetProgress(85);
+            SetStatus("Preparing update...");
+
+            // Get launcher directory
+            var launcherDir = AppConfiguration.LauncherDirectory;
+            var backupDir = Path.Combine(Path.GetTempPath(), "Kaadu_Backup");
+
+            // Create update script that will:
+            // 1. Wait for current process to exit
+            // 2. Backup old files
+            // 3. Copy new files
+            // 4. Start the new version
+            // 5. Clean up
+            var updateScript = CreateUpdateScript(tempDir, launcherDir, backupDir);
+            var scriptPath = Path.Combine(Path.GetTempPath(), "kaadu_update.cmd");
+            await File.WriteAllTextAsync(scriptPath, updateScript, cancellationToken).ConfigureAwait(false);
+
+            SetProgress(95);
+            SetStatus("Starting update process...");
+
+            // Start the update script
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = $"/c \"{scriptPath}\"",
+                UseShellExecute = true,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+
+            Process.Start(psi);
+
+            SetProgress(100);
+            SetStatus("Update ready. Restarting...");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to download launcher update: {ex.Message}");
+            SetStatus($"Update failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static string CreateUpdateScript(string sourceDir, string targetDir, string backupDir)
+    {
+        var currentPid = Environment.ProcessId;
+        var launcherExe = Path.Combine(targetDir, "Kaadu.exe");
+        
+        return $"""
+            @echo off
+            echo Waiting for launcher to close...
+            :waitloop
+            tasklist /FI "PID eq {currentPid}" 2>NUL | find /I "{currentPid}" >NUL
+            if "%ERRORLEVEL%"=="0" (
+                timeout /t 1 /nobreak >NUL
+                goto waitloop
+            )
+            
+            echo Creating backup...
+            if exist "{backupDir}" rmdir /s /q "{backupDir}"
+            mkdir "{backupDir}"
+            xcopy "{targetDir}\*.*" "{backupDir}\" /E /I /Q /Y >NUL 2>&1
+            
+            echo Applying update...
+            xcopy "{sourceDir}\*.*" "{targetDir}\" /E /I /Q /Y
+            
+            if %ERRORLEVEL% NEQ 0 (
+                echo Update failed, restoring backup...
+                xcopy "{backupDir}\*.*" "{targetDir}\" /E /I /Q /Y >NUL 2>&1
+                pause
+                exit /b 1
+            )
+            
+            echo Starting updated launcher...
+            start "" "{launcherExe}"
+            
+            echo Cleaning up...
+            timeout /t 3 /nobreak >NUL
+            rmdir /s /q "{sourceDir}" >NUL 2>&1
+            rmdir /s /q "{backupDir}" >NUL 2>&1
+            del /f /q "%~f0"
+            """;
+    }
+
+    private static bool IsNewerVersion(string remote, string local)
+    {
+        try
+        {
+            var remoteVersion = Version.Parse(remote.TrimStart('v', 'V'));
+            var localVersion = Version.Parse(local.TrimStart('v', 'V'));
+            return remoteVersion > localVersion;
+        }
+        catch
+        {
+            // If parsing fails, do string comparison
+            return string.Compare(remote, local, StringComparison.OrdinalIgnoreCase) > 0;
+        }
+    }
+
+    private void SetProgress(double progress)
+    {
+        ProgressChanged?.Invoke(this, progress);
+    }
+
+    private void SetStatus(string message)
+    {
+        StatusChanged?.Invoke(this, message);
+    }
+}
