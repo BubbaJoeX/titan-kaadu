@@ -11,7 +11,7 @@ public static class AppConfiguration
     /// <summary>
     /// The current launcher version.
     /// </summary>
-    public const string LauncherVersion = "1.0.3";
+    public const string LauncherVersion = "1.0.1";
 
     /// <summary>
     /// The default local installation path for the game.
@@ -55,29 +55,39 @@ public static class AppConfiguration
     public const int SftpPort = 22;
 
     /// <summary>
-    /// Remote path for base game archive.
+    /// Remote base path for SFTP uploads.
     /// </summary>
-    public const string BaseGamePath = "/upload/base/game.zip";
+    public const string SftpBasePath = "/sftp/sftpuser/upload";
+
+    /// <summary>
+    /// Remote path for base game files.
+    /// </summary>
+    public const string BaseGamePath = "/sftp/sftpuser/upload/base/";
+
+    /// <summary>
+    /// Name of the base game manifest file.
+    /// </summary>
+    public const string BaseManifestFileName = "base_manifest.json";
 
     /// <summary>
     /// Remote path for update files.
     /// </summary>
-    public const string UpdatesPath = "/upload/updates/";
+    public const string UpdatesPath = "/sftp/sftpuser/upload/updates/";
 
     /// <summary>
     /// Remote path for configuration files.
     /// </summary>
-    public const string ConfigPath = "/upload/config/";
+    public const string ConfigPath = "/sftp/sftpuser/upload/config/";
 
     /// <summary>
     /// Remote path for launcher version info.
     /// </summary>
-    public const string LauncherVersionPath = "/upload/config/launcher.json";
+    public const string LauncherVersionPath = "/sftp/sftpuser/upload/config/launcher.json";
 
     /// <summary>
     /// Remote path for launcher binaries (version folders live here).
     /// </summary>
-    public const string LauncherBinariesPath = "/upload/launcher/";
+    public const string LauncherBinariesPath = "/sftp/sftpuser/upload/launcher/";
 
     /// <summary>
     /// Name of the update manifest file.

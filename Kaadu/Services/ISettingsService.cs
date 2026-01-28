@@ -45,7 +45,7 @@ public interface ISettingsService
     bool HasConfiguredInstallPath { get; }
 
     /// <summary>
-    /// Gets whether the SwgClientSetup_r.exe has been run.
+    /// Gets whether the SwgTitanSetup_r.exe has been run.
     /// </summary>
     bool HasRunSetup { get; }
 

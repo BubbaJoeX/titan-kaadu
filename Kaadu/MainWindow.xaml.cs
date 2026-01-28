@@ -94,6 +94,14 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Stops background audio (called when game launches).
+    /// </summary>
+    public void StopBackgroundAudio()
+    {
+        BackgroundAudio.Pause();
+    }
+
     private void BackgroundVideo_MediaEnded(object sender, RoutedEventArgs e)
     {
         // Loop the video

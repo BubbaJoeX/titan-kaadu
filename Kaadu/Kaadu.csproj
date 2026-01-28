@@ -8,23 +8,23 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\TITAN_LOGO.ico</ApplicationIcon>
+
+    <!-- Single-file publishing -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
-    <PackageReference Include="SharpCompress" Version="0.44.1" />
     <PackageReference Include="SSH.NET" Version="2024.2.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\TITAN_LOGO.png" />
     <Resource Include="Assets\TITAN_LOGO.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Assets\TITAN_LOGO.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
 </Project>

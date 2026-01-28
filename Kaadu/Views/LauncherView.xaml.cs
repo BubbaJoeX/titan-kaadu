@@ -21,5 +21,10 @@ public partial class LauncherView : UserControl
             img.Visibility = Visibility.Collapsed;
         }
     }
+
+    private void Button_Click(object sender, RoutedEventArgs e)
+    {
+
+    }
 }
 

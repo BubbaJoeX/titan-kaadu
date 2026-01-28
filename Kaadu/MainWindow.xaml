@@ -44,9 +44,13 @@ Icon="Assets/TITAN_LOGO.ico">
         </Border.Effect>
 
         <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="337*"/>
+                <ColumnDefinition Width="262*"/>
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition Height="32"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
             </Grid.RowDefinitions>
 
             <!-- Background Video -->
@@ -57,7 +61,7 @@ Icon="Assets/TITAN_LOGO.ico">
                           UnloadedBehavior="Stop"
                           Stretch="UniformToFill"
                           IsMuted="True"
-                          MediaEnded="BackgroundVideo_MediaEnded"/>
+                          MediaEnded="BackgroundVideo_MediaEnded" Grid.ColumnSpan="2"/>
 
             <!-- Background Audio (separate for independent control) -->
             <MediaElement x:Name="BackgroundAudio"
@@ -66,17 +70,17 @@ Icon="Assets/TITAN_LOGO.ico">
                           Source="https://swgtitan.org/audio/music_autorun_new_lp.mp3"
                           Volume="0.3"
                           MediaEnded="BackgroundAudio_MediaEnded"
-                          Visibility="Collapsed"/>
+                          Visibility="Collapsed" Grid.ColumnSpan="2"/>
 
             <!-- Semi-transparent overlay for better readability -->
             <Border Grid.RowSpan="2" 
                     Background="{StaticResource PrimaryBackgroundBrush}"
-                    Opacity="0.6"/>
+                    Opacity="0.6" Grid.ColumnSpan="2"/>
 
             <!-- Custom Title Bar -->
             <Grid Grid.Row="0" 
                   Background="{StaticResource SecondaryBackgroundBrush}"
-                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown" Grid.ColumnSpan="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -88,13 +92,8 @@ Icon="Assets/TITAN_LOGO.ico">
                             VerticalAlignment="Center"
                             Margin="12,0,0,0">
                     <Image Source="Assets/TITAN_LOGO.png"
-                           Width="16" Height="16"
-                           VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
-                    <TextBlock Text="Titan Launcher"
-                               Foreground="{StaticResource TextSecondaryBrush}"
-                               FontSize="12"
-                               VerticalAlignment="Center"/>
+                           Width="22" Height="23" RenderTransformOrigin="0.746,-0.089"
+                           />
                 </StackPanel>
 
                 <!-- Window Controls -->
@@ -110,12 +109,12 @@ Icon="Assets/TITAN_LOGO.ico">
                     <Button x:Name="MinimizeButton"
                             Style="{StaticResource IconButtonStyle}"
                             Click="MinimizeButton_Click">
-                        <TextBlock Text="─" FontSize="12"/>
+                        <TextBlock Text="-" FontSize="12"/>
                     </Button>
                     <Button x:Name="MaximizeButton"
                             Style="{StaticResource IconButtonStyle}"
                             Click="MaximizeButton_Click">
-                        <TextBlock Text="□" FontSize="12"/>
+                        <TextBlock Text="O" FontSize="12"/>
                     </Button>
                     <Button x:Name="CloseButton"
                             Style="{StaticResource CloseButtonStyle}"
@@ -127,14 +126,14 @@ Icon="Assets/TITAN_LOGO.ico">
 
             <!-- Main Content Area -->
             <ContentControl Grid.Row="1" 
-                            Content="{Binding CurrentViewModel}"/>
+                            Content="{Binding CurrentViewModel}" Grid.ColumnSpan="2"/>
 
             <!-- Resize Grip -->
             <ResizeGrip Grid.Row="1"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Bottom"
                         Cursor="SizeNWSE"
-                        Opacity="0.3"/>
+                        Opacity="0.3" Grid.Column="1"/>
         </Grid>
     </Border>
 </Window>

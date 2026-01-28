@@ -73,7 +73,7 @@ public interface IUpdateService
     Task LaunchGameAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Opens the SwgClientSetup_r.exe for initial configuration.
+    /// Opens the SwgTitanSetup_r.exe for initial configuration.
     /// </summary>
     Task OpenSetupExecutableAsync(CancellationToken cancellationToken = default);
 

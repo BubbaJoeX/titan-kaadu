@@ -75,7 +75,7 @@
                             Command="{Binding OpenAdminCommand}"
                             Visibility="{Binding ShowAdminButton, Converter={StaticResource BoolToVisibilityConverter}}"
                             Padding="16,8"
-                            Margin="0,0,12,0"/>
+                            Margin="0,0,12,0" Click="Button_Click"/>
                     <Button Content="Logout"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding LogoutCommand}"

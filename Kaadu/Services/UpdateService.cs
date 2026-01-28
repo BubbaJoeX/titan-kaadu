@@ -1,11 +1,8 @@
 using System.Diagnostics;
 using System.IO;
-using SharpCompress.Archives.SevenZip;
-using SharpCompress.Common;
 using System.Text;
 using System.Text.Json;
 using Kaadu.Models;
-using SharpCompress.Archives;
 
 namespace Kaadu.Services;
 
@@ -153,106 +150,97 @@ public sealed class UpdateService : IUpdateService
     {
         try
         {
-            SetStatus(UpdateStatus.Downloading, "Downloading base game...");
+            SetStatus(UpdateStatus.Checking, "Fetching base game manifest...");
 
-            // Check if base game exists on server first
-            var baseGameExists = await _sftpService.FileExistsAsync(AppConfiguration.BaseGamePath, cancellationToken).ConfigureAwait(false);
-            if (!baseGameExists)
+            // Download base game manifest
+            var baseManifest = await GetBaseManifestAsync(cancellationToken).ConfigureAwait(false);
+            if (baseManifest == null)
             {
-                SetStatus(UpdateStatus.Error, $"Base game not found on server at {AppConfiguration.BaseGamePath}");
+                SetStatus(UpdateStatus.Error, "Base game manifest not found on server.");
                 return false;
             }
 
             // Ensure install directory exists
             Directory.CreateDirectory(AppConfiguration.InstallPath);
 
-            var tempZipPath = Path.Combine(Path.GetTempPath(), "kaadu_game.zip");
+            // Check which files need to be downloaded (supports resume)
+            SetStatus(UpdateStatus.Verifying, "Checking existing files...");
+            var filesToDownload = await GetBaseFilesNeedingDownloadAsync(baseManifest, cancellationToken).ConfigureAwait(false);
 
-            // Download base game
-            var downloadProgress = new Progress<double>(p =>
+            var totalManifestFiles = baseManifest.Files.Count;
+            var alreadyDownloaded = totalManifestFiles - filesToDownload.Count;
+
+            if (filesToDownload.Count == 0)
             {
-                SetProgress(p * 0.7); // 70% for download
-                SetStatusMessage($"Downloading base game... {p:F0}%");
-            });
-
-            await _sftpService.DownloadFileAsync(
-                AppConfiguration.BaseGamePath,
-                tempZipPath,
-                downloadProgress,
-                cancellationToken).ConfigureAwait(false);
-
-            // Extract to install path (7z or zip contains 'clean' folder)
-            SetStatus(UpdateStatus.Extracting, "Extracting game files...");
-            SetProgress(75);
-
-            await Task.Run(() =>
-            {
-                var ext = Path.GetExtension(tempZipPath).ToLowerInvariant();
-                if (ext == ".7z")
-                {
-                    using var archive = SevenZipArchive.Open(tempZipPath);
-                    foreach (var entry in archive.Entries.Where(e => !e.IsDirectory))
-                    {
-                        var outPath = Path.Combine(AppConfiguration.InstallPath, entry.Key.Replace('/', Path.DirectorySeparatorChar));
-                        var outDir = Path.GetDirectoryName(outPath);
-                        if (!string.IsNullOrEmpty(outDir))
-                            Directory.CreateDirectory(outDir);
-                        entry.WriteToFile(outPath, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
-                    }
-                }
-                else
-                {
-                    System.IO.Compression.ZipFile.ExtractToDirectory(tempZipPath, AppConfiguration.InstallPath, overwriteFiles: true);
-                }
-            }, cancellationToken).ConfigureAwait(false);
-
-            SetProgress(85);
-
-            // Move files from 'clean' subfolder up one level
-            var cleanFolder = Path.Combine(AppConfiguration.InstallPath, "clean");
-            if (Directory.Exists(cleanFolder))
-            {
-                SetStatusMessage("Organizing game files...");
-                await Task.Run(() =>
-                {
-                    // Move all files from clean folder to install path
-                    foreach (var file in Directory.GetFiles(cleanFolder, "*", SearchOption.AllDirectories))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        
-                        var relativePath = Path.GetRelativePath(cleanFolder, file);
-                        var destPath = Path.Combine(AppConfiguration.InstallPath, relativePath);
-                        var destDir = Path.GetDirectoryName(destPath);
-                        
-                        if (!string.IsNullOrEmpty(destDir))
-                        {
-                            Directory.CreateDirectory(destDir);
-                        }
-                        
-                        // Move file (overwrite if exists)
-                        if (File.Exists(destPath))
-                        {
-                            File.Delete(destPath);
-                        }
-                        File.Move(file, destPath);
-                    }
-
-                    // Delete the now-empty clean folder
-                    Directory.Delete(cleanFolder, recursive: true);
-                }, cancellationToken).ConfigureAwait(false);
+                // All files already present and verified
+                SetProgress(100);
+                await File.WriteAllTextAsync(AppConfiguration.BaseInstalledMarkerPath, DateTime.UtcNow.ToString("O"), cancellationToken).ConfigureAwait(false);
+                SetStatusMessage("Base game verified. Checking for updates...");
+                return true;
             }
 
-            SetProgress(95);
+            // Show resume message if some files already exist
+            if (alreadyDownloaded > 0)
+            {
+                SetStatus(UpdateStatus.Downloading, $"Resuming installation ({filesToDownload.Count} files remaining)...");
+            }
+            else
+            {
+                SetStatus(UpdateStatus.Downloading, $"Downloading base game ({filesToDownload.Count} files)...");
+            }
+
+            var downloadedFiles = 0;
+            var totalFiles = filesToDownload.Count;
+            var totalBytes = filesToDownload.Sum(f => f.Size);
+            var downloadedBytes = 0L;
+
+            foreach (var file in filesToDownload)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Skip files with null or empty paths
+                if (string.IsNullOrWhiteSpace(file.Path))
+                {
+                    downloadedFiles++;
+                    continue;
+                }
+
+                var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+                var remotePath = AppConfiguration.BaseGamePath + file.Path;
+
+                // Ensure directory exists
+                var localDir = Path.GetDirectoryName(localPath);
+                if (!string.IsNullOrEmpty(localDir))
+                {
+                    Directory.CreateDirectory(localDir);
+                }
+
+                SetStatusMessage($"Downloading: {file.Path}");
+
+                var fileProgress = new Progress<double>(p =>
+                {
+                    var bytesProgress = downloadedBytes + (long)(file.Size * p / 100);
+                    var totalProgress = totalBytes > 0 ? (double)bytesProgress / totalBytes * 95 : 0; // Reserve 5% for finalization
+                    SetProgress(totalProgress);
+                });
+
+                await _sftpService.DownloadFileAsync(remotePath, localPath, fileProgress, cancellationToken).ConfigureAwait(false);
+
+                // Verify downloaded file
+                if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+                {
+                    SetStatus(UpdateStatus.Error, $"Downloaded file verification failed: {file.Path}");
+                    return false;
+                }
+
+                downloadedBytes += file.Size;
+                downloadedFiles++;
+            }
+
+            SetProgress(98);
 
             // Create marker file
             await File.WriteAllTextAsync(AppConfiguration.BaseInstalledMarkerPath, DateTime.UtcNow.ToString("O"), cancellationToken).ConfigureAwait(false);
-
-            // Clean up temp file
-            try
-            {
-                File.Delete(tempZipPath);
-            }
-            catch { /* Ignore cleanup errors */ }
 
             SetProgress(100);
             SetStatusMessage("Base game installed. Checking for updates...");
@@ -268,6 +256,57 @@ public sealed class UpdateService : IUpdateService
             SetStatus(UpdateStatus.Error, $"Installation failed: {ex.Message}");
             return false;
         }
+    }
+
+    private async Task<UpdateManifest?> GetBaseManifestAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var manifestPath = AppConfiguration.ConfigPath + AppConfiguration.BaseManifestFileName;
+            var json = await _sftpService.DownloadTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<UpdateManifest>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<List<FileEntry>> GetBaseFilesNeedingDownloadAsync(UpdateManifest manifest, CancellationToken cancellationToken)
+    {
+        var filesToDownload = new List<FileEntry>();
+        var totalFiles = manifest.Files.Count;
+        var checkedFiles = 0;
+
+        foreach (var file in manifest.Files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Skip files with null or empty paths
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                checkedFiles++;
+                continue;
+            }
+
+            var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+
+            // Check if file exists and has correct hash
+            if (!File.Exists(localPath))
+            {
+                filesToDownload.Add(file);
+            }
+            else if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+            {
+                filesToDownload.Add(file);
+            }
+
+            checkedFiles++;
+            var progress = (double)checkedFiles / totalFiles * 100;
+            SetProgress(progress);
+        }
+
+        return filesToDownload;
     }
 
 
@@ -336,20 +375,20 @@ public sealed class UpdateService : IUpdateService
 
     public Task LaunchGameAsync(CancellationToken cancellationToken = default)
     {
-        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgClient_r.exe");
+        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgTitan_r.exe");
 
         if (!File.Exists(exePath))
         {
             throw new FileNotFoundException("Game executable not found.", exePath);
         }
 
-        // UseShellExecute = true ensures the working directory is used for DLL search paths
-        // This is required for the game to find DirectX DLLs in the install folder
+        // UseShellExecute = false is required for DirectX 9 games to properly initialize
+        // The working directory must be set so the game can find its DLLs
         var psi = new ProcessStartInfo
         {
             FileName = exePath,
             WorkingDirectory = AppConfiguration.InstallPath,
-            UseShellExecute = true
+            UseShellExecute = false
         };
 
         Process.Start(psi);
@@ -358,7 +397,7 @@ public sealed class UpdateService : IUpdateService
 
     public async Task OpenSetupExecutableAsync(CancellationToken cancellationToken = default)
     {
-        var setupPath = Path.Combine(AppConfiguration.InstallPath, "SwgClientSetup_r.exe");
+        var setupPath = Path.Combine(AppConfiguration.InstallPath, "SwgTitanSetup_r.exe");
 
         if (!File.Exists(setupPath))
         {
@@ -385,7 +424,7 @@ public sealed class UpdateService : IUpdateService
         ArgumentNullException.ThrowIfNull(password);
         ArgumentNullException.ThrowIfNull(serverAddress);
 
-        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgClient_r.exe");
+        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgTitan_r.exe");
 
         if (!File.Exists(exePath))
         {
@@ -409,19 +448,19 @@ public sealed class UpdateService : IUpdateService
         commandLineBuilder.Append($" loginClientPassword={password}");
         commandLineBuilder.Append(" autoConnectToLoginServer=true");
         commandLineBuilder.Append(" -s Station gameFeatures=34929");
-        commandLineBuilder.Append(" -s SwgClient allowMultipleInstances=true");
+        commandLineBuilder.Append(" -s SwgTitan allowMultipleInstances=true");
 
         System.Diagnostics.Debug.WriteLine($"Launch args: {commandLineBuilder}");
         SetStatusMessage("Launching with auto-login parameters");
 
-        // UseShellExecute = true ensures the working directory is used for DLL search paths
-        // This is required for the game to find DirectX DLLs in the install folder
+        // UseShellExecute = false is required for DirectX 9 games to properly initialize
+        // The working directory must be set so the game can find its DLLs
         var psi = new ProcessStartInfo
         {
             FileName = exePath,
             Arguments = commandLineBuilder.ToString(),
             WorkingDirectory = AppConfiguration.InstallPath,
-            UseShellExecute = true
+            UseShellExecute = false
         };
 
         Process.Start(psi);

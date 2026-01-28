@@ -15,7 +15,7 @@ public sealed class SftpService : ISftpService, IDisposable
     /// <summary>
     /// SFTP username for file server access.
     /// </summary>
-    private const string SftpUsername = "sftpuser";
+    private const string SftpUsername = "swg";
 
     /// <summary>
     /// SFTP password for file server access.

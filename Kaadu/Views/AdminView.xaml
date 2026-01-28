@@ -5,10 +5,9 @@
          xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
          xmlns:vm="clr-namespace:Kaadu.ViewModels"
          mc:Ignorable="d"
-         d:DesignHeight="600" d:DesignWidth="900"
-         d:DataContext="{d:DesignInstance Type=vm:AdminViewModel}">
+         d:DataContext="{d:DesignInstance Type=vm:AdminViewModel}" Height="678" Width="1364">
 
-<Grid Background="Transparent">
+    <Grid Background="Transparent">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -64,106 +63,104 @@
                     Margin="0,0,12,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                    <TextBlock Text="Maintenance Actions"
+                        <TextBlock Text="Maintenance Actions"
                                Style="{StaticResource HeadingStyle}"
                                FontSize="16"
                                Margin="0,0,0,20"/>
 
-                    <!-- Force Update -->
-                    <Button Content="Force Update"
+                        <!-- Force Update -->
+                        <Button Content="Force Update"
                             Style="{StaticResource BaseButtonStyle}"
                             Command="{Binding ForceUpdateCommand}"
                             Margin="0,0,0,12"
                             HorizontalAlignment="Stretch"/>
 
-                    <!-- Repair Game -->
-                    <Button Content="Repair Game Files"
+                        <!-- Repair Game -->
+                        <Button Content="Repair Game Files"
                             Style="{StaticResource BaseButtonStyle}"
                             Command="{Binding RepairGameCommand}"
                             Margin="0,0,0,12"
-                            HorizontalAlignment="Stretch"/>
+                            HorizontalAlignment="Stretch" Height="43"/>
 
-                    <!-- Reinstall Base -->
-                    <Button Content="Reinstall Base Game"
+                        <!-- Reinstall Base -->
+                        <Button Content="Reinstall Base Game"
                             Style="{StaticResource DangerButtonStyle}"
                             Command="{Binding ReinstallBaseCommand}"
                             Margin="0,0,0,24"
-                            HorizontalAlignment="Stretch"/>
-
-                    <!-- Cancel Button -->
-                    <Button Content="Cancel Operation"
+                            HorizontalAlignment="Stretch" Height="41"/>
+                        <Button Content="Cancel Operation"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding CancelOperationCommand}"
-                            IsEnabled="{Binding IsOperationRunning}"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,0,0,24"/>
+                            IsEnabled="{Binding IsOperationRunning}" Height="45"/>
 
-                    <!-- Progress -->
-                    <StackPanel Visibility="{Binding IsOperationRunning, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
+                        <!-- Cancel Button -->
+
+                        <!-- Progress -->
+                        <StackPanel Visibility="{Binding IsOperationRunning, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding StatusMessage, Mode=OneWay}"
                                    Style="{StaticResource StatusTextStyle}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,8"/>
-                        <ProgressBar Style="{StaticResource ModernProgressBarStyle}"
+                            <ProgressBar Style="{StaticResource ModernProgressBarStyle}"
                                      Value="{Binding Progress, Mode=OneWay}"
                                      Maximum="100"/>
-                    </StackPanel>
+                        </StackPanel>
 
-                    <!-- Separator -->
-                    <Rectangle Height="1" 
+                        <!-- Separator -->
+                        <Rectangle Height="1" 
                                Fill="{StaticResource BorderBrush}" 
                                Margin="0,12"/>
 
 
-                    <!-- Manifest Generation (Server Admin) -->
-                    <Border BorderBrush="{StaticResource BorderBrush}"
+                        <!-- Manifest Generation (Server Admin) -->
+                        <Border BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="12"
                             Margin="0,12,0,16"
                             Background="{StaticResource SecondaryBackgroundBrush}">
-                        <StackPanel>
-                            <TextBlock Text="Server Management: Update Manifest"
+                            <StackPanel>
+                                <TextBlock Text="Server Management: Update Manifest"
                                        Style="{StaticResource HeadingStyle}"
                                        FontSize="15"
                                        Margin="0,0,0,8"/>
-                            <TextBlock Text="This will scan /upload/updates/, compute hashes, and upload update_manifest.json to /upload/config/."
+                                <TextBlock Text="This will scan /upload/updates/, compute hashes, and upload update_manifest.json to /upload/config/."
                                        Style="{StaticResource StatusTextStyle}"
                                        FontSize="12"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,8"/>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Version: "
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Version: "
                                            Style="{StaticResource FormLabelStyle}"
                                            Margin="0,0,8,0"
                                            VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding ManifestVersion, UpdateSourceTrigger=PropertyChanged}"
+                                    <TextBox Text="{Binding ManifestVersion, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource ModernTextBoxStyle}"
                                          Width="80"
                                          VerticalAlignment="Center"
                                          Margin="0,0,8,0"/>
-                                <Button Content="Update Manifest"
+                                    <Button Content="Update Manifest"
                                         Style="{StaticResource PrimaryButtonStyle}"
                                         Command="{Binding GenerateManifestCommand}"
                                         ToolTip="Scan /upload/updates/, compute hashes, and upload manifest to /upload/config/update_manifest.json."
                                         Padding="16,6"
                                         VerticalAlignment="Center"/>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
-                    </Border>
+                        </Border>
 
-                    <!-- Separator -->
-                    <Rectangle Height="1" 
+                        <!-- Separator -->
+                        <Rectangle Height="1" 
                                Fill="{StaticResource BorderBrush}" 
                                Margin="0,12"/>
 
-                    <!-- Utility Actions -->
-                    <TextBlock Text="Utilities"
+                        <!-- Utility Actions -->
+                        <TextBlock Text="Utilities"
                                Style="{StaticResource HeadingStyle}"
                                FontSize="16"
                                Margin="0,12,0,16"/>
 
-                    <Button Content="Open Install Folder"
+                        <Button Content="Open Install Folder"
                             Style="{StaticResource SecondaryButtonStyle}"
                             Command="{Binding OpenInstallFolderCommand}"
                             HorizontalAlignment="Stretch"/>

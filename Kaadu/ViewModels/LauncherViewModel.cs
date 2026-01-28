@@ -138,19 +138,25 @@ public sealed partial class LauncherViewModel : ViewModelBase
         try
         {
             IsBusy = true;
-            
+
+            // Stop background audio when launching game
+            if (Application.Current.MainWindow is MainWindow mainWindow)
+            {
+                mainWindow.StopBackgroundAudio();
+            }
+
             // Debug: Log session info
             System.Diagnostics.Debug.WriteLine($"PlayAsync - Username: '{_userSession.Username}', Password set: {!string.IsNullOrEmpty(_userSession.Password)}, ServerAddress: '{_userSession.ServerAddress}'");
-            
+
             // Use auto-login if credentials are available
             if (!string.IsNullOrEmpty(_userSession.Password) && 
                 !string.IsNullOrEmpty(_userSession.ServerAddress))
             {
                 // Use selected character base name (without server suffix) if available
                 var characterName = SelectedCharacter?.BaseName;
-                
+
                 System.Diagnostics.Debug.WriteLine($"Launching with auto-login - User: '{_userSession.Username}'");
-                
+
                 await _updateService.LaunchGameWithAutoLoginAsync(
                     _userSession.Username,
                     _userSession.Password,
@@ -164,9 +170,9 @@ public sealed partial class LauncherViewModel : ViewModelBase
             }
 
             // Minimize launcher to tray so the game has full viewport
-            if (Application.Current.MainWindow is { } mainWindow)
+            if (Application.Current.MainWindow is { } window)
             {
-                mainWindow.WindowState = WindowState.Minimized;
+                window.WindowState = WindowState.Minimized;
             }
         }
         catch (Exception ex)
@@ -343,20 +349,10 @@ public sealed partial class LauncherViewModel : ViewModelBase
     {
         if (_updateService.IsBaseGameInstalled)
         {
-            if (!_settingsService.HasRunSetup)
-            {
-                // Base game installed but setup not run yet
-                ShowSetupButton = true;
-                CanPlay = false;
-                StatusMessage = "Please run setup before playing.";
-            }
-            else
-            {
-                // Ready to play
-                ShowSetupButton = false;
-                CanPlay = true;
-                StatusMessage = "Ready to play!";
-            }
+            // Ready to play once base game is installed
+            ShowSetupButton = true; // Always show setup for user convenience
+            CanPlay = true;
+            StatusMessage = "Ready to play!";
         }
         else
         {
@@ -364,7 +360,7 @@ public sealed partial class LauncherViewModel : ViewModelBase
             ShowSetupButton = false;
             CanPlay = false;
         }
-        
+
         PlayCommand.NotifyCanExecuteChanged();
         OpenSetupCommand.NotifyCanExecuteChanged();
     }

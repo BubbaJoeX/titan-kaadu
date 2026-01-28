@@ -29,7 +29,7 @@ public sealed class UserSettings
         : AppConfiguration.DefaultInstallPath;
 
     /// <summary>
-    /// Indicates whether the SwgClientSetup_r.exe has been run at least once.
+    /// Indicates whether the SwgTitanSetup_r.exe has been run at least once.
     /// </summary>
     [JsonPropertyName("hasRunSetup")]
     public bool HasRunSetup { get; set; }
