@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("kaadu-manifest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7ef9acad96dcfba867ac7655b4c34ffa6be3414a")]
 [assembly: System.Reflection.AssemblyProductAttribute("kaadu-manifest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("kaadu-manifest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

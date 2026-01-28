@@ -1,12 +1,14 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Renci.SshNet;
 
 namespace KaaduManifestGenerator;
 
 /// <summary>
-/// Kaadu Patch Manifest Generator
-/// Generates update_manifest.json files for the Kaadu game launcher.
+/// Kaadu Manifest Generator
+/// Generates base_manifest.json (for initial installation) and update_manifest.json (for patches) 
+/// files for the Kaadu game launcher.
 /// </summary>
 public static class Program
 {
@@ -16,50 +18,91 @@ public static class Program
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
+    // Default SFTP settings
+    private const string DefaultSftpHost = "test.swgtitan.org";
+    private const int DefaultSftpPort = 22;
+
     public static async Task<int> Main(string[] args)
     {
-        Console.WriteLine("╔══════════════════════════════════════════╗");
-        Console.WriteLine("║   Kaadu Patch Manifest Generator v1.0   ║");
-        Console.WriteLine("╚══════════════════════════════════════════╝");
+        Console.WriteLine("╔═════════════════════════════════════════════╗");
+        Console.WriteLine("║      Kaadu Manifest Generator v1.2         ║");
+        Console.WriteLine("║  For base game and update manifest files   ║");
+        Console.WriteLine("╚═════════════════════════════════════════════╝");
         Console.WriteLine();
 
         if (args.Length == 0 || args.Contains("--help") || args.Contains("-h"))
         {
-            PrintUsage();
-            return args.Length == 0 ? 1 : 0;
-        }
+                    PrintUsage();
+                    return args.Length == 0 ? 1 : 0;
+                }
 
-        var command = args[0].ToLowerInvariant();
+                var command = args[0].ToLowerInvariant();
 
-        return command switch
-        {
-            "generate" => await GenerateManifestAsync(args.Skip(1).ToArray()),
-            "verify" => await VerifyManifestAsync(args.Skip(1).ToArray()),
-            "hash" => await HashFileAsync(args.Skip(1).ToArray()),
-            _ => InvalidCommand(command)
-        };
-    }
+                return command switch
+                {
+                    "generate" => await GenerateManifestAsync(args.Skip(1).ToArray()),
+                    "sftp-generate" => await SftpGenerateManifestAsync(args.Skip(1).ToArray()),
+                    "sftp-upload" => await SftpUploadManifestAsync(args.Skip(1).ToArray()),
+                    "sftp-list" => await SftpListAsync(args.Skip(1).ToArray()),
+                    "verify" => await VerifyManifestAsync(args.Skip(1).ToArray()),
+                    "hash" => await HashFileAsync(args.Skip(1).ToArray()),
+                    _ => InvalidCommand(command)
+                };
+            }
 
     private static void PrintUsage()
     {
         Console.WriteLine("Usage: kaadu-manifest <command> [options]");
         Console.WriteLine();
         Console.WriteLine("Commands:");
-        Console.WriteLine("  generate   Generate a new manifest from a game directory");
-        Console.WriteLine("  verify     Verify files against an existing manifest");
-        Console.WriteLine("  hash       Calculate SHA-256 hash of a single file");
+        Console.WriteLine("  generate       Generate a manifest from a local directory");
+        Console.WriteLine("  sftp-generate  Generate a manifest from files on SFTP server (CDN)");
+        Console.WriteLine("  sftp-upload    Upload a manifest file to SFTP server");
+        Console.WriteLine("  verify         Verify local files against a manifest");
+        Console.WriteLine("  hash           Calculate SHA-256 hash of a single file");
         Console.WriteLine();
-        Console.WriteLine("Generate Options:");
+        Console.WriteLine("Generate Options (local):");
         Console.WriteLine("  -d, --directory <path>   Game files directory (required)");
         Console.WriteLine("  -v, --version <version>  Version string (required)");
         Console.WriteLine("  -o, --output <path>      Output manifest path (default: update_manifest.json)");
         Console.WriteLine("  -e, --exclude <pattern>  Exclude pattern (can be used multiple times)");
         Console.WriteLine();
+        Console.WriteLine("SFTP Generate Options:");
+        Console.WriteLine("  -r, --remote <path>      Remote SFTP path to scan (required, e.g., /upload/base/)");
+        Console.WriteLine("  -v, --version <version>  Version string (required)");
+        Console.WriteLine("  -o, --output <path>      Output manifest path (default: base_manifest.json)");
+        Console.WriteLine("  -u, --user <username>    SFTP username (required)");
+        Console.WriteLine("  -p, --password <pass>    SFTP password (or use -k for key file)");
+        Console.WriteLine("  -k, --key <keyfile>      SFTP private key file path");
+        Console.WriteLine("  -h, --host <hostname>    SFTP host (default: test.swgtitan.org)");
+        Console.WriteLine("  --port <port>            SFTP port (default: 22)");
+        Console.WriteLine("  -e, --exclude <pattern>  Exclude pattern (can be used multiple times)");
+        Console.WriteLine();
+        Console.WriteLine("SFTP Upload Options:");
+        Console.WriteLine("  -m, --manifest <path>    Local manifest file to upload (required)");
+        Console.WriteLine("  -r, --remote <path>      Remote destination path (required)");
+        Console.WriteLine("  -u, --user <username>    SFTP username (required)");
+        Console.WriteLine("  -p, --password <pass>    SFTP password (or use -k for key file)");
+        Console.WriteLine("  -k, --key <keyfile>      SFTP private key file path");
+        Console.WriteLine("  -h, --host <hostname>    SFTP host (default: test.swgtitan.org)");
+        Console.WriteLine("  --port <port>            SFTP port (default: 22)");
+        Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  kaadu-manifest generate -d ./game -v 1.2.3 -o manifest.json");
-        Console.WriteLine("  kaadu-manifest generate -d C:\\game -v 1.0.0 -e *.log -e *.tmp");
-        Console.WriteLine("  kaadu-manifest verify -d ./game -m manifest.json");
-        Console.WriteLine("  kaadu-manifest hash ./game/bin/client.exe");
+        Console.WriteLine();
+        Console.WriteLine("  Generate base game manifest from SFTP server:");
+        Console.WriteLine("    kaadu-manifest sftp-generate -r /upload/base/ -v 1.0.0 -u admin -p secret -o base_manifest.json");
+        Console.WriteLine();
+        Console.WriteLine("  Generate update manifest from SFTP server:");
+        Console.WriteLine("    kaadu-manifest sftp-generate -r /upload/updates/ -v 1.2.3 -u admin -k ~/.ssh/id_rsa -o update_manifest.json");
+        Console.WriteLine();
+        Console.WriteLine("  Upload manifest to SFTP server:");
+        Console.WriteLine("    kaadu-manifest sftp-upload -m base_manifest.json -r /upload/base/base_manifest.json -u admin -p secret");
+        Console.WriteLine();
+        Console.WriteLine("  Generate from local directory:");
+        Console.WriteLine("    kaadu-manifest generate -d ./base_game -v 1.0.0 -o base_manifest.json");
+        Console.WriteLine();
+        Console.WriteLine("  Verify local files:");
+        Console.WriteLine("    kaadu-manifest verify -d ./game -m manifest.json");
     }
 
     private static int InvalidCommand(string command)
@@ -179,23 +222,461 @@ public static class Program
         await File.WriteAllTextAsync(output, json);
 
         Console.WriteLine();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✓ Manifest generated successfully!");
-        Console.ResetColor();
-        Console.WriteLine($"  Files:      {files.Count}");
-        Console.WriteLine($"  Total size: {FormatSize(manifest.TotalSize)}");
-        Console.WriteLine($"  Output:     {Path.GetFullPath(output)}");
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"✓ Manifest generated successfully!");
+            Console.ResetColor();
+            Console.WriteLine($"  Files:      {files.Count}");
+            Console.WriteLine($"  Total size: {FormatSize(manifest.TotalSize)}");
+            Console.WriteLine($"  Output:     {Path.GetFullPath(output)}");
 
-        return 0;
-    }
+            return 0;
+        }
 
-    private static async Task<int> VerifyManifestAsync(string[] args)
-    {
-        string? directory = null;
-        string manifestPath = "update_manifest.json";
-
-        for (int i = 0; i < args.Length; i++)
+        private static async Task<int> SftpGenerateManifestAsync(string[] args)
         {
+            string? remotePath = null;
+            string? version = null;
+            string output = "base_manifest.json";
+            string? username = null;
+            string? password = null;
+            string? keyFile = null;
+            string host = DefaultSftpHost;
+            int port = DefaultSftpPort;
+            var excludePatterns = new List<string> { "*.log", "*.tmp", "version.json", ".base_installed", ".mdmp", "*.txt", "*.json" };
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "-r":
+                    case "--remote":
+                        remotePath = args[++i];
+                        break;
+                    case "-v":
+                    case "--version":
+                        version = args[++i];
+                        break;
+                    case "-o":
+                    case "--output":
+                        output = args[++i];
+                        break;
+                    case "-u":
+                    case "--user":
+                        username = args[++i];
+                        break;
+                    case "-p":
+                    case "--password":
+                        password = args[++i];
+                        break;
+                    case "-k":
+                    case "--key":
+                        keyFile = args[++i];
+                        break;
+                    case "-h":
+                    case "--host":
+                        host = args[++i];
+                        break;
+                    case "--port":
+                        port = int.Parse(args[++i]);
+                        break;
+                    case "-e":
+                    case "--exclude":
+                        excludePatterns.Add(args[++i]);
+                        break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(remotePath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --remote path is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(version))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --version is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --user is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(password) && string.IsNullOrEmpty(keyFile))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: Either --password or --key is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            // Normalize remote path
+            if (!remotePath.EndsWith('/'))
+                remotePath += '/';
+
+            Console.WriteLine($"SFTP Host:   {host}:{port}");
+            Console.WriteLine($"Remote Path: {remotePath}");
+            Console.WriteLine($"Version:     {version}");
+            Console.WriteLine($"Output:      {output}");
+            Console.WriteLine($"Excluding:   {string.Join(", ", excludePatterns)}");
+            Console.WriteLine();
+
+            try
+                {
+                    // Create SFTP client - use simple constructor like the main app
+                    using var client = !string.IsNullOrEmpty(keyFile)
+                        ? new SftpClient(host, port, username, new PrivateKeyFile(keyFile))
+                        : new SftpClient(host, port, username, password!);
+
+                    // Set connection timeout
+                    client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(30);
+                    client.OperationTimeout = TimeSpan.FromMinutes(5);
+
+                    Console.WriteLine("Connecting to SFTP server...");
+                    client.Connect();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("Connected!");
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                // Recursively list all files
+                Console.WriteLine("Scanning remote directory...");
+                var remoteFiles = new List<(string RelativePath, long Size)>();
+                await ScanRemoteDirectoryAsync(client, remotePath, remotePath, remoteFiles, excludePatterns);
+
+                Console.WriteLine($"Found {remoteFiles.Count} files to process.");
+                Console.WriteLine();
+
+                // Compute hashes for all files
+                var files = new List<FileEntry>();
+                var processedCount = 0;
+
+                foreach (var (relativePath, size) in remoteFiles)
+                {
+                    processedCount++;
+                    Console.Write($"  [{processedCount}/{remoteFiles.Count}] Hashing: {relativePath}... ");
+
+                    var fullPath = remotePath + relativePath;
+                    var hash = await ComputeRemoteHashAsync(client, fullPath);
+
+                    files.Add(new FileEntry
+                    {
+                        Path = relativePath,
+                        Checksum = hash,
+                        Size = size
+                    });
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"OK ({FormatSize(size)})");
+                    Console.ResetColor();
+                }
+
+                client.Disconnect();
+
+                var manifest = new UpdateManifest
+                {
+                    LatestVersion = version,
+                    Files = files.OrderBy(f => f.Path).ToList(),
+                    GeneratedAt = DateTime.UtcNow,
+                    TotalSize = files.Sum(f => f.Size)
+                };
+
+                var json = JsonSerializer.Serialize(manifest, JsonOptions);
+                await File.WriteAllTextAsync(output, json);
+
+                Console.WriteLine();
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"✓ Manifest generated successfully!");
+                Console.ResetColor();
+                Console.WriteLine($"  Files:      {files.Count}");
+                Console.WriteLine($"  Total size: {FormatSize(manifest.TotalSize)}");
+                Console.WriteLine($"  Output:     {Path.GetFullPath(output)}");
+
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Error: {ex.Message}");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
+        private static Task ScanRemoteDirectoryAsync(SftpClient client, string basePath, string currentPath, List<(string RelativePath, long Size)> files, List<string> excludePatterns)
+        {
+            foreach (var entry in client.ListDirectory(currentPath))
+            {
+                if (entry.Name == "." || entry.Name == "..")
+                    continue;
+
+                var fullPath = currentPath + entry.Name;
+                var relativePath = fullPath.Substring(basePath.Length);
+
+                if (entry.IsDirectory)
+                {
+                    ScanRemoteDirectoryAsync(client, basePath, fullPath + "/", files, excludePatterns);
+                }
+                else if (entry.IsRegularFile)
+                {
+                    // Check exclusions
+                    var fileName = entry.Name;
+                    if (excludePatterns.Any(p => MatchesPattern(fileName, p) || MatchesPattern(relativePath, p)))
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"  [SKIP] {relativePath}");
+                        Console.ResetColor();
+                        continue;
+                    }
+
+                    files.Add((relativePath, entry.Length));
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        private static async Task<string> ComputeRemoteHashAsync(SftpClient client, string remotePath)
+        {
+            using var memoryStream = new MemoryStream();
+            client.DownloadFile(remotePath, memoryStream);
+            memoryStream.Position = 0;
+            var hashBytes = await SHA256.HashDataAsync(memoryStream);
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+        private static async Task<int> SftpUploadManifestAsync(string[] args)
+        {
+            string? manifestPath = null;
+            string? remotePath = null;
+            string? username = null;
+            string? password = null;
+            string? keyFile = null;
+            string host = DefaultSftpHost;
+            int port = DefaultSftpPort;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                switch (args[i])
+                {
+                    case "-m":
+                    case "--manifest":
+                        manifestPath = args[++i];
+                        break;
+                    case "-r":
+                    case "--remote":
+                        remotePath = args[++i];
+                        break;
+                    case "-u":
+                    case "--user":
+                        username = args[++i];
+                        break;
+                    case "-p":
+                    case "--password":
+                        password = args[++i];
+                        break;
+                    case "-k":
+                    case "--key":
+                        keyFile = args[++i];
+                        break;
+                    case "-h":
+                    case "--host":
+                        host = args[++i];
+                        break;
+                    case "--port":
+                        port = int.Parse(args[++i]);
+                        break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(manifestPath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --manifest is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(remotePath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --remote is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(username))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: --user is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (string.IsNullOrEmpty(password) && string.IsNullOrEmpty(keyFile))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Error: Either --password or --key is required");
+                Console.ResetColor();
+                return 1;
+            }
+
+            if (!File.Exists(manifestPath))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Error: Manifest file not found: {manifestPath}");
+                Console.ResetColor();
+                return 1;
+            }
+
+            Console.WriteLine($"SFTP Host:   {host}:{port}");
+            Console.WriteLine($"Local File:  {Path.GetFullPath(manifestPath)}");
+            Console.WriteLine($"Remote Path: {remotePath}");
+            Console.WriteLine();
+
+                try
+                {
+                    // Create SFTP client - use simple constructor like the main app
+                    using var client = !string.IsNullOrEmpty(keyFile)
+                        ? new SftpClient(host, port, username, new PrivateKeyFile(keyFile))
+                        : new SftpClient(host, port, username, password!);
+
+                    // Set connection timeout
+                    client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(30);
+                    client.OperationTimeout = TimeSpan.FromMinutes(5);
+
+                    Console.WriteLine("Connecting to SFTP server...");
+                    client.Connect();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("Connected!");
+                    Console.ResetColor();
+
+                    Console.WriteLine("Uploading manifest...");
+                    await using var fileStream = File.OpenRead(manifestPath);
+                    client.UploadFile(fileStream, remotePath, true);
+
+                    client.Disconnect();
+
+                    Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine($"✓ Manifest uploaded successfully to {remotePath}");
+                                    Console.ResetColor();
+
+                                    return 0;
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine($"Error: {ex.Message}");
+                                    Console.ResetColor();
+                                    return 1;
+                                }
+                            }
+
+                    private static async Task<int> SftpListAsync(string[] args)
+                    {
+                        string remotePath = ".";
+                        string? username = null;
+                        string? password = null;
+                        string? keyFile = null;
+                        string host = DefaultSftpHost;
+                        int port = DefaultSftpPort;
+
+                        for (int i = 0; i < args.Length; i++)
+                        {
+                            switch (args[i])
+                            {
+                                case "-r":
+                                case "--remote":
+                                    remotePath = args[++i];
+                                    break;
+                                case "-u":
+                                case "--user":
+                                    username = args[++i];
+                                    break;
+                                case "-p":
+                                case "--password":
+                                    password = args[++i];
+                                    break;
+                                case "-k":
+                                case "--key":
+                                    keyFile = args[++i];
+                                    break;
+                                case "-h":
+                                case "--host":
+                                    host = args[++i];
+                                    break;
+                                case "--port":
+                                    port = int.Parse(args[++i]);
+                                    break;
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(username))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("Error: --user is required");
+                            Console.ResetColor();
+                            return 1;
+                        }
+
+                        if (string.IsNullOrEmpty(password) && string.IsNullOrEmpty(keyFile))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("Error: Either --password or --key is required");
+                            Console.ResetColor();
+                            return 1;
+                        }
+
+                        try
+                        {
+                            using var client = !string.IsNullOrEmpty(keyFile)
+                                ? new SftpClient(host, port, username, new PrivateKeyFile(keyFile))
+                                : new SftpClient(host, port, username, password!);
+
+                            client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(30);
+
+                            Console.WriteLine($"Connecting to {host}:{port}...");
+                            client.Connect();
+                            Console.WriteLine($"Connected! Listing: {remotePath}\n");
+
+                            foreach (var entry in client.ListDirectory(remotePath))
+                            {
+                                if (entry.Name == "." || entry.Name == "..")
+                                    continue;
+
+                                var type = entry.IsDirectory ? "[DIR] " : "      ";
+                                var size = entry.IsDirectory ? "" : $" ({FormatSize(entry.Length)})";
+                                Console.WriteLine($"  {type}{entry.Name}{size}");
+                            }
+
+                            client.Disconnect();
+                            return 0;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"Error: {ex.Message}");
+                            Console.ResetColor();
+                            return 1;
+                        }
+                    }
+
+                    private static async Task<int> VerifyManifestAsync(string[] args)
+                    {
+                        string? directory = null;
+                        string manifestPath = "update_manifest.json";
+
+                        for (int i = 0; i < args.Length; i++)
+                        {
             switch (args[i])
             {
                 case "-d":
