@@ -27,20 +27,20 @@
     Build and deploy, prompting for credentials
 
 #.EXAMPLE
-    .\deploy.ps1 -Version 1.0.2 -Deploy -User admin
-    Build and deploy with specified username
-#>
+        .\deploy.ps1 -Version 1.0.2 -Deploy -User swg
+        Build and deploy with specified username
+    #>
 
-param(
-    [Parameter(Mandatory=$true)]
-    [string]$Version,
-    
-    [switch]$Deploy,
-    
-    [string]$SftpHost = "test.swgtitan.org",
-    
-    [string]$User
-)
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Version,
+
+        [switch]$Deploy,
+
+        [string]$SftpHost = "test.swgtitan.org",
+
+        [string]$User = "swg"
+    )
 
 $ErrorActionPreference = "Stop"
 
@@ -73,17 +73,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Publish
+# Publish as single file
 Write-Host ""
-Write-Host "Publishing Kaadu..." -ForegroundColor Yellow
-dotnet publish Kaadu\Kaadu.csproj -c Release -o "Kaadu\bin\Release\publish" --self-contained false
+Write-Host "Publishing Kaadu as single-file executable..." -ForegroundColor Yellow
+dotnet publish Kaadu\Kaadu.csproj -c Release
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Publish failed!" -ForegroundColor Red
     exit 1
 }
 
-$publishedExe = "Kaadu\bin\Release\net9.0-windows\publish\win-x64\Kaadu.exe"
+$publishedExe = "Kaadu\bin\Release\net9.0-windows\win-x64\publish\Kaadu.exe"
 if (-not (Test-Path $publishedExe)) {
     Write-Host "Error: Published executable not found at $publishedExe" -ForegroundColor Red
     exit 1
@@ -117,11 +117,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Starting deployment..." -ForegroundColor Yellow
 
-$deployArgs = @($Version, $publishedExe, "--host", $SftpHost)
-
-if ($User) {
-    $deployArgs += @("--user", $User)
-}
+$deployArgs = @($Version, $publishedExe, "--host", $SftpHost, "--user", $User)
 
 dotnet run --project Kaadu.Deploy\Kaadu.Deploy.csproj -c Release -- @deployArgs
 

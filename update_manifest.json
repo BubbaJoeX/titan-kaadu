@@ -1,0 +1,87 @@
+{
+  "latest_version": "1.0.3",
+  "files": [
+    {
+      "path": "assets.titanpak",
+      "checksum": "1b860f475d7f629225aaeb476e452f372a1a93106388eb722730bf448021b158",
+      "size": 992053135
+    },
+    {
+      "path": "client.titanpak",
+      "checksum": "3d395329f598cc7901cc852a088f75a9c3cda5840d4a6127d089dc9fe7105733",
+      "size": 431331325
+    },
+    {
+      "path": "gl05_r.dll",
+      "checksum": "30ba04500cdec39dd71008a8046a01ac927bd58a17b1f62cb097920531d0f332",
+      "size": 2414080
+    },
+    {
+      "path": "gl06_r.dll",
+      "checksum": "ea41afadb3bf1b156a7f90935329d2f39e7ddc77ebbb62757c6eaad8dc2b0a29",
+      "size": 2379776
+    },
+    {
+      "path": "gl07_r.dll",
+      "checksum": "bf034761bd00ac492d28720d219f4cf89f38af1fee8661c1c2651dbe27076bfc",
+      "size": 2400256
+    },
+    {
+      "path": "graphics.titanpak",
+      "checksum": "258c09a9170833c06c5c64adfc1b83d60955c649887145f73d3da631647282dd",
+      "size": 83181675
+    },
+    {
+      "path": "live.cfg",
+      "checksum": "0bbe08f556969d5913b6b680bd290aa8107a68377581e27c71c9b3df3a24d090",
+      "size": 456
+    },
+    {
+      "path": "login.cfg",
+      "checksum": "20e22cf736181dcc40acec88381d0186f871de2f35134371f25e88aa1ff7ac8b",
+      "size": 163
+    },
+    {
+      "path": "preload.cfg",
+      "checksum": "bcd05d88e41c018583e153b18cc85ef9001fe10e503907a6fd525ff7060f490b",
+      "size": 2018
+    },
+    {
+      "path": "shared.titanpak",
+      "checksum": "c8db85512375a2fd24388c460c2ab35017216e4ceaf2246d98c63bd2d4b20f61",
+      "size": 8914384
+    },
+    {
+      "path": "sku4_client.titanlst",
+      "checksum": "776c0981fd4b35839c42dc6cacce581de4452a024829382bc38722cc3e6744be",
+      "size": 1517169
+    },
+    {
+      "path": "SwgTitan_r.exe",
+      "checksum": "2b9ce0c4b9133c18b5e7fb74ceeec361b9edbbd99ead9067b49fc6f66f85895e",
+      "size": 29143552
+    },
+    {
+      "path": "SwgTitanSetup_r.exe",
+      "checksum": "6b80ba3513e6bab47845948235a96f06e5a74dfcbaf7557bff46c3cb212bf35f",
+      "size": 487936
+    },
+    {
+      "path": "titan.cfg",
+      "checksum": "2d46e9974c4e4db9d124876e50a556c52ab99e87593e2ead6e7887be5a1a25be",
+      "size": 718
+    },
+    {
+      "path": "u1.titanpak",
+      "checksum": "42cb2e404cc2cb206e5ee0629ff3e9254d2111825ab1182a50bef972f979a977",
+      "size": 695436
+    },
+    {
+      "path": "ux.titanpak",
+      "checksum": "8c0e7eb6ee312935b7939587f4614a66a1f1f980aa5b307ad5e5e8d7524f346d",
+      "size": 1613235
+    }
+  ],
+  "generated_at": "2026-01-31T22:41:03.932889Z",
+  "total_size": 1556135314
+}
