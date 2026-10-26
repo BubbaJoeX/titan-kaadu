@@ -1,0 +1,663 @@
+﻿using System.Diagnostics;
+using System.IO;
+using System.Text;
+using System.Text.Json;
+using Kaadu.Models;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Implementation of update service for game installation and updates.
+/// </summary>
+public sealed class UpdateService : IUpdateService
+{
+    private readonly ISftpService _sftpService;
+    private readonly IHashService _hashService;
+
+    private UpdateStatus _status = UpdateStatus.Idle;
+    private string _statusMessage = string.Empty;
+    private double _progress;
+
+    public UpdateService(ISftpService sftpService, IHashService hashService)
+    {
+        _sftpService = sftpService ?? throw new ArgumentNullException(nameof(sftpService));
+        _hashService = hashService ?? throw new ArgumentNullException(nameof(hashService));
+    }
+
+    public UpdateStatus Status => _status;
+    public string StatusMessage => _statusMessage;
+    public double Progress => _progress;
+
+    public event EventHandler<UpdateStatus>? StatusChanged;
+    public event EventHandler<double>? ProgressChanged;
+    public event EventHandler<string>? StatusMessageChanged;
+
+    public bool IsBaseGameInstalled => File.Exists(AppConfiguration.BaseInstalledMarkerPath);
+
+    public async Task<string> GetLocalVersionAsync(CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(AppConfiguration.LocalVersionPath))
+        {
+            return "0.0.0";
+        }
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(AppConfiguration.LocalVersionPath, cancellationToken).ConfigureAwait(false);
+            var localVersion = JsonSerializer.Deserialize<LocalVersion>(json);
+            return localVersion?.Version ?? "0.0.0";
+        }
+        catch
+        {
+            return "0.0.0";
+        }
+    }
+
+    public async Task<UpdateManifest?> GetRemoteManifestAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var manifestPath = AppConfiguration.ConfigPath + AppConfiguration.ManifestFileName;
+            var json = await _sftpService.DownloadTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<UpdateManifest>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<bool> CheckAndUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            SetStatus(UpdateStatus.Checking, "Checking for updates...");
+
+            // Check base game installation
+            if (!IsBaseGameInstalled)
+            {
+                SetStatusMessage("Base game not installed. Starting installation...");
+                var baseInstallResult = await InstallBaseGameAsync(cancellationToken).ConfigureAwait(false);
+                if (!baseInstallResult)
+                {
+                    return false;
+                }
+                // Continue to download updates after base game is installed
+            }
+
+            // Get manifests
+            var manifest = await GetRemoteManifestAsync(cancellationToken).ConfigureAwait(false);
+            if (manifest == null)
+            {
+                // No manifest available - game is ready but can't check for updates
+                SetStatus(UpdateStatus.Ready, "Ready to play! (Update server unavailable)");
+                return true;
+            }
+
+            var localVersion = await GetLocalVersionAsync(cancellationToken).ConfigureAwait(false);
+
+            // Compare versions or if we just installed base game, download all update files
+            if (string.Equals(localVersion, manifest.LatestVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                // Same version - verify files
+                SetStatus(UpdateStatus.Verifying, "Verifying game files...");
+                var filesToUpdate = await GetFilesNeedingUpdateAsync(manifest, cancellationToken).ConfigureAwait(false);
+
+                if (filesToUpdate.Count == 0)
+                {
+                    SetStatus(UpdateStatus.Ready, "Game is up to date!");
+                    return true;
+                }
+
+                // Download missing/corrupted files
+                if (!await DownloadFilesAsync(filesToUpdate, cancellationToken).ConfigureAwait(false))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                // Different version - download updates
+                SetStatusMessage($"Update available: {localVersion} → {manifest.LatestVersion}");
+                var updateFiles = await GetFilesNeedingUpdateAsync(manifest, cancellationToken).ConfigureAwait(false);
+
+                if (!await DownloadFilesAsync(updateFiles, cancellationToken).ConfigureAwait(false))
+                {
+                    return false;
+                }
+            }
+
+            // Update local version
+            await SaveLocalVersionAsync(manifest.LatestVersion, cancellationToken).ConfigureAwait(false);
+            SetStatus(UpdateStatus.Ready, "Update complete!");
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus(UpdateStatus.Idle, "Update cancelled.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            SetStatus(UpdateStatus.Error, $"Update failed: {ex.Message}");
+            return false;
+        }
+    }
+
+
+
+    public async Task<bool> InstallBaseGameAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            SetStatus(UpdateStatus.Checking, "Fetching base game manifest...");
+
+            // Download base game manifest
+            var baseManifest = await GetBaseManifestAsync(cancellationToken).ConfigureAwait(false);
+            if (baseManifest == null)
+            {
+                SetStatus(UpdateStatus.Error, "Base game manifest not found on server.");
+                return false;
+            }
+
+            // Ensure install directory exists
+            Directory.CreateDirectory(AppConfiguration.InstallPath);
+
+            // Check which files need to be downloaded (supports resume)
+            SetStatus(UpdateStatus.Verifying, "Checking existing files...");
+            var filesToDownload = await GetBaseFilesNeedingDownloadAsync(baseManifest, cancellationToken).ConfigureAwait(false);
+
+            var totalManifestFiles = baseManifest.Files.Count;
+            var alreadyDownloaded = totalManifestFiles - filesToDownload.Count;
+
+            if (filesToDownload.Count == 0)
+            {
+                // All files already present and verified
+                SetProgress(100);
+                await File.WriteAllTextAsync(AppConfiguration.BaseInstalledMarkerPath, DateTime.UtcNow.ToString("O"), cancellationToken).ConfigureAwait(false);
+                SetStatusMessage("Base game verified. Checking for updates...");
+                return true;
+            }
+
+            // Show resume message if some files already exist
+            if (alreadyDownloaded > 0)
+            {
+                SetStatus(UpdateStatus.Downloading, $"Resuming installation ({filesToDownload.Count} files remaining)...");
+            }
+            else
+            {
+                SetStatus(UpdateStatus.Downloading, $"Downloading base game ({filesToDownload.Count} files)...");
+            }
+
+            var downloadedFiles = 0;
+            var totalFiles = filesToDownload.Count;
+            var totalBytes = filesToDownload.Sum(f => f.Size);
+            var downloadedBytes = 0L;
+
+            foreach (var file in filesToDownload)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Skip files with null or empty paths
+                if (string.IsNullOrWhiteSpace(file.Path))
+                {
+                    downloadedFiles++;
+                    continue;
+                }
+
+                var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+                var remotePath = AppConfiguration.BaseGamePath + file.Path;
+
+                // Ensure directory exists
+                var localDir = Path.GetDirectoryName(localPath);
+                if (!string.IsNullOrEmpty(localDir))
+                {
+                    Directory.CreateDirectory(localDir);
+                }
+
+                SetStatusMessage($"Downloading: {file.Path}");
+
+                var fileProgress = new Progress<double>(p =>
+                {
+                    var bytesProgress = downloadedBytes + (long)(file.Size * p / 100);
+                    var totalProgress = totalBytes > 0 ? (double)bytesProgress / totalBytes * 95 : 0; // Reserve 5% for finalization
+                    SetProgress(totalProgress);
+                });
+
+                await _sftpService.DownloadFileAsync(remotePath, localPath, fileProgress, cancellationToken).ConfigureAwait(false);
+
+                // Verify downloaded file
+                if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+                {
+                    SetStatus(UpdateStatus.Error, $"Downloaded file verification failed: {file.Path}");
+                    return false;
+                }
+
+                downloadedBytes += file.Size;
+                downloadedFiles++;
+            }
+
+            SetProgress(98);
+
+            // Create marker file
+            await File.WriteAllTextAsync(AppConfiguration.BaseInstalledMarkerPath, DateTime.UtcNow.ToString("O"), cancellationToken).ConfigureAwait(false);
+
+            SetProgress(100);
+            SetStatusMessage("Base game installed. Checking for updates...");
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus(UpdateStatus.Idle, "Installation cancelled.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            SetStatus(UpdateStatus.Error, $"Installation failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task<UpdateManifest?> GetBaseManifestAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var manifestPath = AppConfiguration.ConfigPath + AppConfiguration.BaseManifestFileName;
+            var json = await _sftpService.DownloadTextAsync(manifestPath, cancellationToken).ConfigureAwait(false);
+            return JsonSerializer.Deserialize<UpdateManifest>(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task<List<FileEntry>> GetBaseFilesNeedingDownloadAsync(UpdateManifest manifest, CancellationToken cancellationToken)
+    {
+        var filesToDownload = new List<FileEntry>();
+        var totalFiles = manifest.Files.Count;
+        var checkedFiles = 0;
+
+        foreach (var file in manifest.Files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Skip files with null or empty paths
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                checkedFiles++;
+                continue;
+            }
+
+            var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+
+            // Check if file exists and has correct hash
+            if (!File.Exists(localPath))
+            {
+                filesToDownload.Add(file);
+            }
+            else if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+            {
+                filesToDownload.Add(file);
+            }
+
+            checkedFiles++;
+            var progress = (double)checkedFiles / totalFiles * 100;
+            SetProgress(progress);
+        }
+
+        return filesToDownload;
+    }
+
+
+    public async Task<bool> RepairGameAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            SetStatus(UpdateStatus.Verifying, "Verifying all game files...");
+
+            var manifest = await GetRemoteManifestAsync(cancellationToken).ConfigureAwait(false);
+            if (manifest == null)
+            {
+                SetStatus(UpdateStatus.Error, "Failed to fetch manifest for repair.");
+                return false;
+            }
+
+            // Force verify all files
+            var filesToRepair = new List<FileEntry>();
+            var totalFiles = manifest.Files.Count;
+            var checkedFiles = 0;
+
+            foreach (var file in manifest.Files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Skip files with null or empty paths
+                if (string.IsNullOrWhiteSpace(file.Path))
+                {
+                    checkedFiles++;
+                    continue;
+                }
+
+                var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+                var needsRepair = !File.Exists(localPath) ||
+                                  !await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false);
+
+                if (needsRepair)
+                {
+                    filesToRepair.Add(file);
+                }
+
+                checkedFiles++;
+                SetProgress((double)checkedFiles / totalFiles * 50); // First 50% for verification
+            }
+
+            if (filesToRepair.Count == 0)
+            {
+                SetStatus(UpdateStatus.Ready, "All files verified. No repairs needed.");
+                return true;
+            }
+
+            SetStatusMessage($"Repairing {filesToRepair.Count} files...");
+            return await DownloadFilesAsync(filesToRepair, cancellationToken, 50).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            SetStatus(UpdateStatus.Idle, "Repair cancelled.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            SetStatus(UpdateStatus.Error, $"Repair failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public Task LaunchGameAsync(CancellationToken cancellationToken = default)
+    {
+        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgClient_r.exe");
+
+        if (!File.Exists(exePath))
+        {
+            throw new FileNotFoundException("Game executable not found.", exePath);
+        }
+
+        // UseShellExecute = false is required for DirectX 9 games to properly initialize
+        // The working directory must be set so the game can find its DLLs
+        var psi = new ProcessStartInfo
+        {
+            FileName = exePath,
+            WorkingDirectory = AppConfiguration.InstallPath,
+            UseShellExecute = false
+        };
+
+        Process.Start(psi);
+        return Task.CompletedTask;
+    }
+
+    public async Task OpenSetupExecutableAsync(CancellationToken cancellationToken = default)
+    {
+        var setupPath = Path.Combine(AppConfiguration.InstallPath, "SwgClientSetup_r.exe");
+
+        if (!File.Exists(setupPath))
+        {
+            throw new FileNotFoundException("Setup executable not found.", setupPath);
+        }
+
+        var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = setupPath,
+            WorkingDirectory = AppConfiguration.InstallPath,
+            UseShellExecute = true
+        });
+
+        // Wait for setup to complete asynchronously
+        if (process != null)
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    public Task LaunchGameWithAutoLoginAsync(string username, string password, string serverAddress, string? selectedCharacter = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(username);
+        ArgumentNullException.ThrowIfNull(password);
+        ArgumentNullException.ThrowIfNull(serverAddress);
+
+        var exePath = Path.Combine(AppConfiguration.InstallPath, "SwgClient_r.exe");
+
+        if (!File.Exists(exePath))
+        {
+            throw new FileNotFoundException("Game executable not found.", exePath);
+        }
+
+        // Build command line arguments using StringBuilder for better maintainability
+        // NOTE: Password is passed as command-line argument as required by the game client.
+        // This is the standard method for SWG auto-login, though it may be visible in process lists.
+        var commandLineBuilder = new StringBuilder();
+        commandLineBuilder.Append("--launched -- -s ClientGame");
+        commandLineBuilder.Append($" loginServerAddress={serverAddress}");
+        commandLineBuilder.Append(" loginServerPort=44453");
+        
+        if (!string.IsNullOrWhiteSpace(selectedCharacter))
+        {
+            commandLineBuilder.Append($" launcherAvatarName={selectedCharacter}");
+        }
+        
+        commandLineBuilder.Append($" loginClientID={username}");
+        commandLineBuilder.Append($" loginClientPassword={password}");
+        commandLineBuilder.Append(" autoConnectToLoginServer=true");
+        commandLineBuilder.Append(" -s Station gameFeatures=34929");
+        commandLineBuilder.Append(" -s SwgClient allowMultipleInstances=true");
+
+        System.Diagnostics.Debug.WriteLine($"Launch args: {commandLineBuilder}");
+        SetStatusMessage("Launching with auto-login parameters");
+
+        // UseShellExecute = false is required for DirectX 9 games to properly initialize
+        // The working directory must be set so the game can find its DLLs
+        var psi = new ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = commandLineBuilder.ToString(),
+            WorkingDirectory = AppConfiguration.InstallPath,
+            UseShellExecute = false
+        };
+
+        Process.Start(psi);
+        return Task.CompletedTask;
+    }
+
+    private async Task<List<FileEntry>> GetFilesNeedingUpdateAsync(UpdateManifest manifest, CancellationToken cancellationToken)
+    {
+        var filesToUpdate = new List<FileEntry>();
+        var totalFiles = manifest.Files.Count;
+        var checkedFiles = 0;
+
+        foreach (var file in manifest.Files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Skip files with null or empty paths
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                checkedFiles++;
+                continue;
+            }
+
+            var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+
+            if (!File.Exists(localPath))
+            {
+                filesToUpdate.Add(file);
+            }
+            else if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+            {
+                filesToUpdate.Add(file);
+            }
+
+            checkedFiles++;
+            var progress = (double)checkedFiles / totalFiles * 100;
+            SetProgress(progress);
+        }
+
+        return filesToUpdate;
+    }
+
+    private async Task<bool> DownloadFilesAsync(List<FileEntry> files, CancellationToken cancellationToken, double progressOffset = 0)
+    {
+        if (files.Count == 0)
+        {
+            SetStatus(UpdateStatus.Ready, "All files up to date!");
+            return true;
+        }
+
+        SetStatus(UpdateStatus.Downloading, $"Downloading {files.Count} files...");
+
+        var downloadedFiles = 0;
+        var totalFiles = files.Count;
+        var progressRange = 100 - progressOffset;
+
+        foreach (var file in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Skip files with null or empty paths
+            if (string.IsNullOrWhiteSpace(file.Path))
+            {
+                downloadedFiles++;
+                continue;
+            }
+
+            var localPath = Path.Combine(AppConfiguration.InstallPath, file.Path);
+            var remotePath = AppConfiguration.UpdatesPath + file.Path;
+
+            SetStatusMessage($"Downloading: {file.Path}");
+
+            var fileProgress = new Progress<double>(p =>
+            {
+                var fileContribution = (double)downloadedFiles / totalFiles;
+                var currentFileContribution = p / 100 / totalFiles;
+                var totalProgress = progressOffset + (fileContribution + currentFileContribution) * progressRange;
+                SetProgress(totalProgress);
+            });
+
+            await _sftpService.DownloadFileAsync(remotePath, localPath, fileProgress, cancellationToken).ConfigureAwait(false);
+
+            // Verify downloaded file
+            if (!await _hashService.VerifyHashAsync(localPath, file.Checksum, cancellationToken).ConfigureAwait(false))
+            {
+                SetStatus(UpdateStatus.Error, $"Downloaded file verification failed: {file.Path}");
+                return false;
+            }
+
+            downloadedFiles++;
+        }
+
+        SetProgress(100);
+        SetStatus(UpdateStatus.Ready, "Download complete!");
+        return true;
+    }
+
+    private async Task SaveLocalVersionAsync(string version, CancellationToken cancellationToken)
+    {
+        var localVersion = new LocalVersion
+        {
+            Version = version,
+            LastUpdated = DateTime.UtcNow,
+            BaseInstalled = true
+        };
+
+        var json = JsonSerializer.Serialize(localVersion, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(AppConfiguration.LocalVersionPath, json, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task GenerateAndUploadManifestAsync(string version, IProgress<string>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(version);
+
+        progress?.Report("Scanning remote updates folder...");
+
+        // List all files in the updates folder recursively
+        var remoteFiles = await _sftpService.ListFilesRecursiveAsync(AppConfiguration.UpdatesPath, cancellationToken).ConfigureAwait(false);
+
+        progress?.Report($"Found {remoteFiles.Count} files. Computing hashes...");
+
+        var fileEntries = new List<FileEntry>();
+        var processedCount = 0;
+
+        foreach (var file in remoteFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var remotePath = AppConfiguration.UpdatesPath + file.Path;
+            progress?.Report($"Hashing: {file.Path} ({processedCount + 1}/{remoteFiles.Count})");
+
+            var hash = await _sftpService.ComputeRemoteHashAsync(remotePath, cancellationToken).ConfigureAwait(false);
+
+            fileEntries.Add(new FileEntry
+            {
+                Path = file.Path,
+                Checksum = hash,
+                Size = file.Size
+            });
+
+            processedCount++;
+        }
+
+        progress?.Report("Generating manifest...");
+
+        var manifest = new UpdateManifest
+        {
+            LatestVersion = version,
+            Files = fileEntries.OrderBy(f => f.Path).ToList(),
+            GeneratedAt = DateTime.UtcNow,
+            TotalSize = fileEntries.Sum(f => f.Size)
+        };
+
+        var manifestJson = JsonSerializer.Serialize(manifest, new JsonSerializerOptions 
+        { 
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        });
+
+        progress?.Report("Uploading manifest to config folder...");
+
+        var manifestPath = AppConfiguration.ConfigPath + AppConfiguration.ManifestFileName;
+        await _sftpService.UploadTextAsync(manifestPath, manifestJson, cancellationToken).ConfigureAwait(false);
+
+        progress?.Report($"Manifest uploaded successfully! {fileEntries.Count} files, {FormatSize(manifest.TotalSize)} total.");
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        string[] sizes = ["B", "KB", "MB", "GB"];
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+
+    private void SetStatus(UpdateStatus status, string message)
+    {
+        _status = status;
+        _statusMessage = message;
+        StatusChanged?.Invoke(this, status);
+        StatusMessageChanged?.Invoke(this, message);
+    }
+
+    private void SetStatusMessage(string message)
+    {
+        _statusMessage = message;
+        StatusMessageChanged?.Invoke(this, message);
+    }
+
+    private void SetProgress(double progress)
+    {
+        _progress = Math.Clamp(progress, 0, 100);
+        ProgressChanged?.Invoke(this, _progress);
+    }
+}

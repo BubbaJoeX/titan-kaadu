@@ -1,0 +1,236 @@
+﻿using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using Kaadu.Models;
+using Renci.SshNet;
+
+namespace Kaadu.Services;
+
+/// <summary>
+/// Implementation of SFTP service using SSH.NET.
+/// </summary>
+public sealed class SftpService : ISftpService, IDisposable
+{
+    /// <summary>
+    /// SFTP username for file server access.
+    /// </summary>
+    private const string SftpUsername = "swg";
+
+    /// <summary>
+    /// SFTP password for file server access.
+    /// </summary>
+    private const string SftpPassword = "Swordsman#0103";
+
+    private SftpClient? _client;
+    private bool _disposed;
+    private readonly object _lock = new();
+
+    public async Task DownloadFileAsync(string remotePath, string localPath, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+        ArgumentNullException.ThrowIfNull(localPath);
+
+        Debug.WriteLine($"[SftpService] DownloadFileAsync - Remote: {remotePath}");
+        Debug.WriteLine($"[SftpService] DownloadFileAsync - Local: {localPath}");
+
+        var client = GetConnectedClient();
+        var directory = Path.GetDirectoryName(localPath);
+        
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Debug.WriteLine($"[SftpService] Attempting to get file info for: {remotePath}");
+            var fileInfo = client.Get(remotePath);
+            var totalBytes = fileInfo.Length;
+            long downloadedBytes = 0;
+
+            Debug.WriteLine($"[SftpService] File size: {totalBytes} bytes");
+
+            using var fileStream = File.Create(localPath);
+
+            client.DownloadFile(remotePath, fileStream, downloaded =>
+            {
+                downloadedBytes = (long)downloaded;
+                if (totalBytes > 0)
+                {
+                    var percentage = (double)downloadedBytes / totalBytes * 100;
+                    progress?.Report(percentage);
+                }
+            });
+            
+            Debug.WriteLine($"[SftpService] Download complete: {remotePath}");
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<string> DownloadTextAsync(string remotePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        var client = GetConnectedClient();
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var memoryStream = new MemoryStream();
+            client.DownloadFile(remotePath, memoryStream);
+            memoryStream.Position = 0;
+
+            using var reader = new StreamReader(memoryStream);
+            return reader.ReadToEnd();
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task UploadTextAsync(string remotePath, string content, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+        ArgumentNullException.ThrowIfNull(content);
+
+        var client = GetConnectedClient();
+
+        await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var memoryStream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+            client.UploadFile(memoryStream, remotePath, canOverride: true);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<string>> ListFilesAsync(string remotePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        var client = GetConnectedClient();
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var files = client.ListDirectory(remotePath)
+                .Where(f => !f.IsDirectory && f.Name != "." && f.Name != "..")
+                .Select(f => f.Name)
+                .ToList();
+
+            return files.AsReadOnly();
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<RemoteFileInfo>> ListFilesRecursiveAsync(string remotePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        var client = GetConnectedClient();
+
+        return await Task.Run(() =>
+        {
+            var files = new List<RemoteFileInfo>();
+            ListFilesRecursiveInternal(client, remotePath, remotePath, files, cancellationToken);
+            return files.AsReadOnly();
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void ListFilesRecursiveInternal(SftpClient client, string basePath, string currentPath, List<RemoteFileInfo> files, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        foreach (var item in client.ListDirectory(currentPath))
+        {
+            if (item.Name == "." || item.Name == "..")
+                continue;
+
+            if (item.IsDirectory)
+            {
+                ListFilesRecursiveInternal(client, basePath, item.FullName, files, cancellationToken);
+            }
+            else
+            {
+                // Get path relative to base path
+                var relativePath = item.FullName;
+                if (relativePath.StartsWith(basePath))
+                {
+                    relativePath = relativePath[basePath.Length..].TrimStart('/');
+                }
+
+                files.Add(new RemoteFileInfo(relativePath, item.Name, item.Length));
+            }
+        }
+    }
+
+    public async Task<string> ComputeRemoteHashAsync(string remotePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        var client = GetConnectedClient();
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            using var memoryStream = new MemoryStream();
+            client.DownloadFile(remotePath, memoryStream);
+            memoryStream.Position = 0;
+
+            var hashBytes = SHA256.HashData(memoryStream);
+            return Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> FileExistsAsync(string remotePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(remotePath);
+
+        var client = GetConnectedClient();
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return client.Exists(remotePath);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private SftpClient GetConnectedClient()
+    {
+        lock (_lock)
+        {
+            if (_client == null)
+            {
+                _client = new SftpClient(AppConfiguration.SftpHost, AppConfiguration.SftpPort, SftpUsername, SftpPassword);
+            }
+
+            if (!_client.IsConnected)
+            {
+                _client.Connect();
+            }
+
+            return _client;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            lock (_lock)
+            {
+                if (_client != null)
+                {
+                    if (_client.IsConnected)
+                    {
+                        _client.Disconnect();
+                    }
+                    _client.Dispose();
+                    _client = null;
+                }
+            }
+            _disposed = true;
+        }
+    }
+}

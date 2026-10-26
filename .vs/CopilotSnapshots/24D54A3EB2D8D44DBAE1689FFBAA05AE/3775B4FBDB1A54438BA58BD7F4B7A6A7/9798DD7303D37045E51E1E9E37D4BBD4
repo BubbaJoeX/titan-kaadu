@@ -1,0 +1,164 @@
+﻿<#
+.SYNOPSIS
+    Generate game manifests from SFTP server (CDN).
+
+.DESCRIPTION
+    This script generates base game or update manifests by scanning files
+    directly on the SFTP server and optionally uploads the manifest.
+
+.PARAMETER Type
+    The type of manifest to generate: 'base' or 'update'
+
+.PARAMETER Version
+    The version number for this manifest (e.g., 1.0.0)
+
+.PARAMETER Upload
+    If specified, upload the manifest to SFTP server after generating
+
+.PARAMETER SftpHost
+    SFTP server hostname (default: test.swgtitan.org)
+
+.PARAMETER User
+    SFTP username (default: sftpuser)
+
+.PARAMETER Password
+    SFTP password (will prompt securely if not provided)
+
+.EXAMPLE
+    .\generate.ps1 -Type base -Version 1.0.0
+    Generate base game manifest only (no upload)
+
+.EXAMPLE
+    .\generate.ps1 -Type base -Version 1.0.0 -Upload
+    Generate and upload base game manifest
+
+.EXAMPLE
+    .\generate.ps1 -Type update -Version 1.2.3 -Upload
+    Generate and upload update manifest
+#>
+
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('base', 'update')]
+    [string]$Type,
+
+    [Parameter(Mandatory=$true)]
+    [string]$Version,
+
+    [switch]$Upload,
+
+        [string]$SftpHost = "test.swgtitan.org",
+
+        [string]$User = "swg",
+
+        [string]$Password
+    )
+
+$ErrorActionPreference = "Stop"
+
+# SFTP base path
+$SftpBasePath = "/sftp/sftpuser/upload"
+
+Write-Host "=== Kaadu Manifest Generator ===" -ForegroundColor Cyan
+Write-Host ""
+
+# Validate version format
+if (-not ($Version -match '^\d+\.\d+\.\d+$')) {
+    Write-Host "Error: Invalid version format. Expected X.Y.Z (e.g., 1.0.0)" -ForegroundColor Red
+    exit 1
+}
+
+# Set paths based on type
+if ($Type -eq 'base') {
+    $remotePath = "$SftpBasePath/base/"
+    $manifestFileName = "base_manifest.json"
+    $remoteManifestPath = "$SftpBasePath/base/base_manifest.json"
+    Write-Host "Generating BASE GAME manifest" -ForegroundColor Yellow
+} else {
+    $remotePath = "$SftpBasePath/updates/"
+    $manifestFileName = "update_manifest.json"
+    $remoteManifestPath = "$SftpBasePath/config/update_manifest.json"
+    Write-Host "Generating UPDATE manifest" -ForegroundColor Yellow
+}
+
+Write-Host "Remote Path:    $remotePath" -ForegroundColor Gray
+Write-Host "Version:        $Version" -ForegroundColor Gray
+Write-Host "Output:         $manifestFileName" -ForegroundColor Gray
+Write-Host ""
+
+# Get password if not provided
+if (-not $Password) {
+    $securePassword = Read-Host "SFTP Password for $User" -AsSecureString
+    $Password = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword))
+}
+
+# Build the manifest generator tool
+Write-Host "Building manifest generator..." -ForegroundColor Yellow
+dotnet build KaaduManifestGenerator\KaaduManifestGenerator.csproj -c Release -v q
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed!" -ForegroundColor Red
+    exit 1
+}
+
+# Generate manifest from SFTP
+Write-Host ""
+Write-Host "Scanning SFTP server and generating manifest..." -ForegroundColor Yellow
+Write-Host ""
+
+$generateArgs = @(
+    "sftp-generate",
+    "-r", $remotePath,
+    "-v", $Version,
+    "-o", $manifestFileName,
+    "-u", $User,
+    "-p", $Password,
+    "--host", $SftpHost
+)
+
+dotnet run --project KaaduManifestGenerator\KaaduManifestGenerator.csproj -c Release --no-build -- @generateArgs
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Manifest generation failed!" -ForegroundColor Red
+    exit 1
+}
+
+# Check if manifest was created
+if (-not (Test-Path $manifestFileName)) {
+    Write-Host "Error: Manifest file was not created" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Manifest generated: $manifestFileName" -ForegroundColor Green
+
+# Upload if requested
+if ($Upload) {
+    Write-Host ""
+    Write-Host "Uploading manifest to $remoteManifestPath..." -ForegroundColor Yellow
+
+    $uploadArgs = @(
+        "sftp-upload",
+        "-m", $manifestFileName,
+        "-r", $remoteManifestPath,
+        "-u", $User,
+        "-p", $Password,
+        "--host", $SftpHost
+    )
+
+    dotnet run --project KaaduManifestGenerator\KaaduManifestGenerator.csproj -c Release --no-build -- @uploadArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Upload failed!" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host ""
+    Write-Host "=== Manifest Generated and Uploaded ===" -ForegroundColor Green
+} else {
+    Write-Host ""
+    Write-Host "To upload the manifest, run:" -ForegroundColor Cyan
+    Write-Host "  .\generate.ps1 -Type $Type -Version $Version -Upload"
+    Write-Host ""
+    Write-Host "=== Manifest Generated ===" -ForegroundColor Green
+}
